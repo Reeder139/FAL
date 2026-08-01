@@ -28,7 +28,11 @@
       "Bash(npx create-expo-app@latest mobile --yes --no-agents-md)",
       "Bash(npx tsc *)",
       "Bash(git check-ignore *)",
-      "Bash(grep -i \"\\\\.env$\\\\|node_modules\")"
+      "Bash(grep -i \"\\\\.env$\\\\|node_modules\")",
+      "Bash(netstat -ano)",
+      "Bash(tasklist //FI \"IMAGENAME eq node.exe\")",
+      "Bash(timeout 20 npm run web)",
+      "Bash(wait 2)"
     ]
   }
 }
