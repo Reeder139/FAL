@@ -18,7 +18,17 @@
       "Bash(npx supabase *)",
       "Bash(docker --version)",
       "Bash(docker info *)",
-      "Bash(psql --version)"
+      "Bash(psql --version)",
+      "Bash(choco --version)",
+      "Bash(wsl --status)",
+      "Bash(wsl --list --verbose)",
+      "PowerShell(Get-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform,Microsoft-Windows-Subsystem-Linux 2>&1)",
+      "PowerShell('VirtualMachinePlatform','Microsoft-Windows-Subsystem-Linux' | ForEach-Object { Get-WindowsOptionalFeature -Online -FeatureName $_ | Select-Object FeatureName, State })",
+      "Bash(npx create-expo-app@latest --help)",
+      "Bash(npx create-expo-app@latest mobile --yes --no-agents-md)",
+      "Bash(npx tsc *)",
+      "Bash(git check-ignore *)",
+      "Bash(grep -i \"\\\\.env$\\\\|node_modules\")"
     ]
   }
 }
