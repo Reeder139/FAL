@@ -11,6 +11,18 @@ feed, and compete in seasonal leaderboards scored from real fish weights.
   Supabase project. There is no migrations directory yet; this file is the source of
   truth for the database.
 
+## UI: design tokens only, never hardcoded values
+
+[`mobile/src/constants/theme.ts`](mobile/src/constants/theme.ts) is the single source
+of truth for color, type, spacing, radius, and shadow — see
+[`mobile/DESIGN.md`](mobile/DESIGN.md) for the full extracted design system and visual
+reference. **Every screen and component must build its styles from `theme.ts`'s
+exports (`Colors`, `Typography`, `Spacing`, `Radii`, `Shadows`, `ButtonVariants`,
+`InputStyle`). No hardcoded hex colors, font sizes, or spacing numbers anywhere in
+screen code.** If a value you need isn't in `theme.ts`, add it there (and document it
+in DESIGN.md) rather than inlining it — that's what keeps light/dark mode and the
+brand's visual consistency from silently drifting screen by screen.
+
 ## Core model: two layers, deliberately separated
 
 - **Posts** are the social layer (the Instagram part). Every feed item is a post —
