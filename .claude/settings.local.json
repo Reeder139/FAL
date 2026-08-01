@@ -32,7 +32,9 @@
       "Bash(netstat -ano)",
       "Bash(tasklist //FI \"IMAGENAME eq node.exe\")",
       "Bash(timeout 20 npm run web)",
-      "Bash(wait 2)"
+      "Bash(wait 2)",
+      "Bash(xargs grep -l \"exif\" -i)",
+      "Bash(npm info *)"
     ]
   }
 }

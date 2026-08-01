@@ -97,24 +97,31 @@ create index on posts (created_at desc);
 create index on posts (author_id, created_at desc);
 
 create table post_media (
-  id              uuid primary key default uuid_generate_v4(),
-  post_id         uuid not null references posts(id) on delete cascade,
-  storage_path    text not null,
-  media_kind      text not null default 'fish'
-                    check (media_kind in ('fish','scales','mat','angler','other')),
-  captured_in_app boolean not null default false,
-  capture_token   text,
-  exif_taken_at   timestamptz,
-  width           integer,
-  height          integer,
-  sort_order      integer not null default 0,
-  created_at      timestamptz not null default now()
+  id                uuid primary key default uuid_generate_v4(),
+  post_id           uuid not null references posts(id) on delete cascade,
+  storage_path      text not null,
+  media_kind        text not null default 'fish'
+                      check (media_kind in ('fish','scales','mat','angler','other')),
+  captured_in_app   boolean not null default false,
+  capture_token     text,
+  exif_taken_at     timestamptz,
+  exif_camera_make  text,
+  exif_camera_model text,
+  -- Difference hash of a fixed-size downscale of the original photo, computed
+  -- client-side before compression (see mobile/src/lib/perceptualHash.ts).
+  -- Used to reject exact-duplicate submissions — see section 13.
+  perceptual_hash   text,
+  width             integer,
+  height            integer,
+  sort_order        integer not null default 0,
+  created_at        timestamptz not null default now()
 );
 
 comment on column post_media.captured_in_app is
   'The single most important anti-fraud field. Tier 2+ evidence requires true.';
 
 create index on post_media (post_id, sort_order);
+create index on post_media (perceptual_hash) where perceptual_hash is not null;
 
 create table likes (
   post_id     uuid not null references posts(id) on delete cascade,
@@ -615,3 +622,82 @@ create policy "users upload to own folder"
     bucket_id = 'post-media'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+
+-- ============================================================================
+-- 13. CATCH PHOTO EVIDENCE CHECKS
+--
+-- Photo input is camera roll upload, not mandatory in-app capture. To
+-- compensate, every uploaded photo carries EXIF (extracted client-side
+-- *before* any resize/compression, since resizing strips it — see
+-- mobile/src/lib/catchPhoto.ts) and a perceptual hash.
+--
+-- This can't be enforced client-side: the catches insert policy only checks
+-- angler_id ownership, not the value of `status`, so a patched client could
+-- just insert status = 'verified' directly. The reject/flag decision has to
+-- happen here, server-side, the same way evidence_tier and captured_in_app
+-- already gate trust structurally rather than by policy alone.
+-- ============================================================================
+
+create or replace function evaluate_catch_evidence()
+returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  v_catch_id  uuid;
+  v_caught_at timestamptz;
+  v_status    text;
+  v_reason    text;
+begin
+  select c.id, c.caught_at, c.status
+    into v_catch_id, v_caught_at, v_status
+  from catches c
+  where c.post_id = new.post_id;
+
+  -- Not a catch post (e.g. a plain photo/announcement post) — nothing to evaluate.
+  if v_catch_id is null then
+    return new;
+  end if;
+
+  -- Rejected is terminal — a later photo can't un-reject a catch.
+  if v_status = 'rejected' then
+    return new;
+  end if;
+
+  -- Exact perceptual-hash collision: hard reject, same image already submitted.
+  if new.perceptual_hash is not null and exists (
+    select 1 from post_media pm
+    where pm.perceptual_hash = new.perceptual_hash
+      and pm.id <> new.id
+  ) then
+    update catches set status = 'rejected' where id = v_catch_id;
+    insert into catch_reviews (catch_id, from_status, to_status, reason, is_system)
+    values (v_catch_id, v_status, 'rejected',
+            'Duplicate image: perceptual hash matches an existing submission.', true);
+    return new;
+  end if;
+
+  -- Already flagged by an earlier photo on this catch — leave it for an admin,
+  -- don't write a second review row for the same underlying issue.
+  if v_status = 'under_review' then
+    return new;
+  end if;
+
+  if new.exif_taken_at is null then
+    v_reason := 'Missing EXIF capture timestamp.';
+  elsif abs(extract(epoch from (new.exif_taken_at - v_caught_at))) > 48 * 3600 then
+    v_reason := 'EXIF capture timestamp is more than 48 hours from the reported catch time.';
+  end if;
+
+  if v_reason is not null then
+    update catches set status = 'under_review' where id = v_catch_id;
+    insert into catch_reviews (catch_id, from_status, to_status, reason, is_system)
+    values (v_catch_id, v_status, 'under_review', v_reason, true);
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger post_media_evaluate_evidence
+  after insert on post_media
+  for each row execute function evaluate_catch_evidence();
