@@ -216,15 +216,21 @@ create table divisions (
   unique (season_id, rank)
 );
 
+-- An angler can have several membership periods within one season (e.g.
+-- leaves, then rejoins later) — no uniqueness constraint on
+-- (season_id, angler_id), left_at marks when a period ended (null = still
+-- active). prize_eligible lets a period keep fishing/scoring without
+-- counting toward prizes.
 create table season_entries (
-  id            uuid primary key default uuid_generate_v4(),
-  season_id     uuid not null references seasons(id) on delete cascade,
-  angler_id     uuid not null references profiles(id) on delete cascade,
-  division_id   uuid not null references divisions(id),
-  tier          text not null default 'open'
-                  check (tier in ('open','competitor')),
-  joined_at     timestamptz not null default now(),
-  unique (season_id, angler_id)
+  id              uuid primary key default uuid_generate_v4(),
+  season_id       uuid not null references seasons(id) on delete cascade,
+  angler_id       uuid not null references profiles(id) on delete cascade,
+  division_id     uuid not null references divisions(id),
+  tier            text not null default 'open'
+                    check (tier in ('open','competitor')),
+  joined_at       timestamptz not null default now(),
+  left_at         timestamptz,
+  prize_eligible  boolean not null default true
 );
 
 create table mini_leagues (
@@ -367,7 +373,9 @@ from catches c
 join season_entries se on se.angler_id = c.angler_id
 join seasons s         on s.id = se.season_id
 where c.status = 'verified'
-  and c.caught_at::date between s.starts_on and s.ends_on;
+  and c.caught_at::date between s.starts_on and s.ends_on
+  and c.caught_at >= se.joined_at
+  and (se.left_at is null or c.caught_at < se.left_at);
 
 -- TODO before launch: the "one counting fish per 24 hours" rule filters here,
 -- not at submission. Anglers should still be able to POST every fish they catch.

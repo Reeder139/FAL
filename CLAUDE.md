@@ -7,9 +7,22 @@ feed, and compete in seasonal leaderboards scored from real fish weights.
 
 - **Client**: Expo (React Native)
 - **Backend**: Supabase (Postgres, Auth, Storage, RLS, Data API)
-- Schema lives in [fal_schema_v2.sql](fal_schema_v2.sql) — run once against a fresh
-  Supabase project. There is no migrations directory yet; this file is the source of
-  truth for the database.
+- [fal_schema_v2.sql](fal_schema_v2.sql) is the cumulative current-state snapshot —
+  what a fresh Supabase project should look like after everything in
+  `supabase/migrations/` has run. `supabase/migrations/` is the actual source of
+  truth for how the live database got there; keep both in sync when you change
+  either.
+
+## Schema changes always go through migrations
+
+**Never make schema changes directly in the Supabase dashboard SQL Editor.** Every
+change — tables, columns, constraints, views, storage buckets, policies — goes in a
+new file under `supabase/migrations/`, applied with `supabase db push`. This
+happened once already: the `post-media` storage bucket and its RLS policies were
+created by hand in the dashboard and had to be reverse-engineered back into a
+migration afterward. `fal_schema_v2.sql` should be updated to match in the same
+change, since it's meant to reflect the current cumulative schema, not just v2's
+original state.
 
 ## UI: design tokens only, never hardcoded values
 
