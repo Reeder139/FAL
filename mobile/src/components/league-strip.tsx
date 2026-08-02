@@ -1,0 +1,74 @@
+import { useRouter } from 'expo-router';
+import { Pressable, StyleSheet, Text } from 'react-native';
+
+import { Radii, Spacing, Typography } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import type { LeagueSummary } from '@/lib/leagueSummary';
+
+// TODO: real trend delta once we have standings history to diff against —
+// hardcoded placeholder for now, per the design ask.
+const PLACEHOLDER_DELTA = '▲3';
+
+function ordinal(n: number): string {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}
+
+function summaryText(summary: LeagueSummary): string {
+  switch (summary.kind) {
+    case 'no_catches':
+      return 'Log your first catch to start scoring';
+    case 'member': {
+      const parts = [summary.divisionName];
+      if (summary.position !== null) parts.push(`${ordinal(summary.position)} of ${summary.divisionMemberCount}`);
+      parts.push(`${summary.points.toFixed(1)} pts ${PLACEHOLDER_DELTA}`);
+      return parts.join(' · ');
+    }
+    case 'free': {
+      const base = `${summary.points.toFixed(1)} pts this season`;
+      const positionPart =
+        summary.position !== null && summary.divisionName
+          ? ` · you'd be ${ordinal(summary.position)} in ${summary.divisionName}`
+          : '';
+      return `${base}${positionPart} — Join`;
+    }
+  }
+}
+
+type LeagueStripProps = {
+  summary: LeagueSummary;
+};
+
+export function LeagueStrip({ summary }: LeagueStripProps) {
+  const theme = useTheme();
+  const router = useRouter();
+
+  return (
+    <Pressable
+      onPress={() => router.push('/league')}
+      style={[styles.container, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+      <Text style={[Typography.bodySmall, { color: theme.text }]} numberOfLines={1}>
+        {summaryText(summary)}
+      </Text>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    borderBottomWidth: 1,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Radii.xs,
+  },
+});

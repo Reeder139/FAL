@@ -1,10 +1,11 @@
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -33,6 +34,7 @@ import { computePoints, fetchSeasonForDate, type SeasonScoring } from '@/lib/sco
 import { DuplicateImageError, submitCatch, type SubmitCatchResult } from '@/lib/submitCatch';
 import { toWeightOz } from '@/lib/units';
 import { generateUuidV4 } from '@/lib/uuid';
+import { useAuth } from '@/providers/auth-provider';
 
 interface PhotoItem {
   id: string;
@@ -57,6 +59,7 @@ function parseDateTimeInput(dateStr: string, timeStr: string): Date | null {
 export default function LogCatchScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { session, loading: authLoading } = useAuth();
 
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [lb, setLb] = useState('');
@@ -245,6 +248,18 @@ export default function LogCatchScreen() {
     prefilledFromExifRef.current = false;
   };
 
+  if (authLoading) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: theme.background }]}>
+        <ActivityIndicator color={theme.primary} />
+      </View>
+    );
+  }
+
+  if (!session) {
+    return <Redirect href="/login" />;
+  }
+
   if (result) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -282,7 +297,12 @@ export default function LogCatchScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SafeAreaView style={styles.flex}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={[Typography.h1, { color: theme.text }]}>Log a catch</Text>
+          <View style={styles.headerRow}>
+            <Text style={[Typography.h1, { color: theme.text }]}>Log a catch</Text>
+            <Pressable onPress={() => router.back()} hitSlop={Spacing.two}>
+              <Text style={[Typography.body, { color: theme.primary }]}>Close</Text>
+            </Pressable>
+          </View>
 
           <View style={styles.section}>
             <Text style={[Typography.h2, { color: theme.text }]}>Photos</Text>
@@ -344,7 +364,7 @@ export default function LogCatchScreen() {
                 <FormField label="Date" value={dateText} onChangeText={handleDateChange} placeholder="YYYY-MM-DD" />
               </View>
               <View style={styles.weightField}>
-                <FormField label="Time (UTC)" value={timeText} onChangeText={handleTimeChange} placeholder="HH:MM" />
+                <FormField label="Time (GMT)" value={timeText} onChangeText={handleTimeChange} placeholder="HH:MM" />
               </View>
             </View>
           </View>
@@ -380,8 +400,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   safeArea: {
     flex: 1,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   content: {
     alignSelf: 'center',
