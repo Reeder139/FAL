@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read",
+      "Bash(npm *)",
+      "Bash(npx expo *)",
+      "Bash(npx supabase *)",
+      "Bash(supabase *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git log*)"
+    ],
+    "ask": [
+      "Bash(supabase db push*)",
+      "Bash(npx supabase db push*)",
+      "Bash(supabase db reset*)",
+      "Bash(npx supabase db reset*)",
+      "Bash(git push*)",
+      "Bash(rm *)"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Edit(**/.env)",
+      "Edit(**/.env.*)",
+      "Write(**/.env)",
+      "Write(**/.env.*)"
+    ]
+  }
+}
