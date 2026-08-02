@@ -34,7 +34,12 @@
       "Bash(timeout 20 npm run web)",
       "Bash(wait 2)",
       "Bash(xargs grep -l \"exif\" -i)",
-      "Bash(npm info *)"
+      "Bash(npm info *)",
+      "Bash(npx expo *)",
+      "Bash(git -C \"C:\\\\FAL\" mv mobile/src/app/index.tsx \"mobile/src/app/\\(tabs\\)/index.tsx\")",
+      "Bash(git -C \"C:\\\\FAL\" mv mobile/src/app/explore.tsx \"mobile/src/app/\\(tabs\\)/explore.tsx\")",
+      "Bash(xargs grep -l \"Icon\")",
+      "Bash(taskkill //F //PID 26896)"
     ]
   }
 }

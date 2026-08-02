@@ -56,6 +56,30 @@ language sql stable security definer set search_path = public as $$
   select coalesce((select p.is_admin from profiles p where p.id = auth.uid()), false);
 $$;
 
+-- Creates the matching profiles row the moment a new auth.users row is
+-- inserted, reading username/display_name from raw_user_meta_data (set via
+-- supabase.auth.signUp's options.data on the client). security definer is
+-- required: this runs inside the same transaction as the auth.users insert,
+-- outside any authenticated request context, so there's no settled
+-- auth.uid() yet for the "users create own profile" RLS policy to check.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.profiles (id, username, display_name)
+  values (
+    new.id,
+    new.raw_user_meta_data ->> 'username',
+    new.raw_user_meta_data ->> 'display_name'
+  );
+  return new;
+end;
+$$;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
 
 -- ============================================================================
 -- 2. VENUES

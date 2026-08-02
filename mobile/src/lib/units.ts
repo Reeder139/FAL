@@ -9,3 +9,9 @@ export function formatWeightOz(weightOz: number): string {
   const oz = weightOz % 16;
   return `${lb}lb ${oz}oz`;
 }
+
+/** Inverse of formatWeightOz — the only place lb/oz form input should get
+ * converted before it's stored as weight_oz. */
+export function toWeightOz(lb: number, oz: number): number {
+  return lb * 16 + oz;
+}
