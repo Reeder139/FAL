@@ -21,6 +21,8 @@ export interface Profile {
   declared_pb_oz: number | null;
   pb_verified: boolean;
   is_admin: boolean;
+  follower_count: number;
+  following_count: number;
 }
 
 interface AuthContextValue {
@@ -39,7 +41,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, display_name, avatar_path, declared_pb_oz, pb_verified, is_admin')
+    .select('id, username, display_name, avatar_path, declared_pb_oz, pb_verified, is_admin, follower_count, following_count')
     .eq('id', userId)
     .single();
 

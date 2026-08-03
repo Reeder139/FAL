@@ -438,7 +438,8 @@ select
   c.species,
   c.fish_name,
   c.status        as catch_status,
-  case when c.venue_hidden then null else v.name end as venue_name
+  case when c.venue_hidden then null else v.name end as venue_name,
+  p.visibility
 from posts p
 join profiles pr on pr.id = p.author_id
 left join catches c on c.post_id = p.id
@@ -456,15 +457,16 @@ where fi.author_id = auth.uid()
    or fi.author_id in (select f.followee_id from follows f where f.follower_id = auth.uid())
 order by fi.created_at desc;
 
--- All public posts. feed_items doesn't expose posts.visibility, but its
--- underlying RLS select policy ("public posts readable") already means
--- every caller only ever sees visibility = 'public' rows through it
--- regardless — this view exists to name that contract explicitly rather
--- than leave it as an implicit side effect of feed_items' own policy.
+-- All public posts — a global feed, not "everything RLS happens to let
+-- this viewer see" (RLS also allows the author, followers-only posts to
+-- actual followers, and league_only posts to divisionmates, so it can't be
+-- relied on to narrow this to public-only by itself). Needs its own
+-- explicit filter, which is why feed_items exposes visibility.
 create or replace view feed_all
 with (security_invoker = on) as
 select fi.*
 from feed_items fi
+where fi.visibility = 'public'
 order by fi.created_at desc;
 
 -- Posts by anglers in the caller's own division, for the season that's
@@ -666,8 +668,41 @@ create policy "signed in users add venues"
   on venues for insert with check (auth.uid() = created_by);
 
 -- --- posts ------------------------------------------------------------------
-create policy "public posts readable"
-  on posts for select using (visibility = 'public' and deleted_at is null);
+-- One policy, four ways in: public to everyone, everything to the author,
+-- followers-only to actual followers, league_only to divisionmates in the
+-- currently running season.
+create policy "posts readable by visibility"
+  on posts for select using (
+    deleted_at is null
+    and (
+      visibility = 'public'
+      or author_id = auth.uid()
+      or (
+        visibility = 'followers'
+        and exists (
+          select 1 from follows f
+          where f.follower_id = auth.uid()
+            and f.followee_id = posts.author_id
+        )
+      )
+      or (
+        visibility = 'league_only'
+        and exists (
+          select 1
+          from season_entries se_me
+          join season_entries se_author
+            on se_author.season_id = se_me.season_id
+           and se_author.division_id = se_me.division_id
+          join seasons s on s.id = se_me.season_id
+          where se_me.angler_id = auth.uid()
+            and se_author.angler_id = posts.author_id
+            and s.status = 'running'
+            and se_me.left_at is null
+            and se_author.left_at is null
+        )
+      )
+    )
+  );
 create policy "authors write own posts"
   on posts for insert with check (auth.uid() = author_id);
 create policy "authors edit own posts"
@@ -844,7 +879,8 @@ create or replace function public.submit_catch(
   p_new_venue_name text,
   p_venue_hidden   boolean,
   p_photos         jsonb,
-  p_post_id        uuid
+  p_post_id        uuid,
+  p_visibility     text default 'public'
 )
 returns table (post_id uuid, catch_id uuid, status text)
 language plpgsql security definer set search_path = public as $$
@@ -865,6 +901,10 @@ declare
 begin
   if v_angler_id is null then
     raise exception 'Must be signed in to submit a catch.';
+  end if;
+
+  if p_visibility not in ('public', 'followers', 'league_only', 'hidden') then
+    raise exception 'Invalid visibility: %', p_visibility;
   end if;
 
   if p_photos is null or jsonb_array_length(p_photos) = 0 then
@@ -900,8 +940,8 @@ begin
 
   v_kind := case when p_weight_oz is not null then 'catch' else 'photo' end;
 
-  insert into posts (id, author_id, kind, caption)
-  values (v_post_id, v_angler_id, v_kind, p_caption);
+  insert into posts (id, author_id, kind, caption, visibility)
+  values (v_post_id, v_angler_id, v_kind, p_caption, p_visibility);
 
   if v_kind = 'catch' then
     select greatest(

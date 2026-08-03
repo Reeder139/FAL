@@ -2,6 +2,10 @@ import { uploadCatchPhoto, type MediaRole, type PreparedCatchPhoto } from '@/lib
 import { supabase } from '@/lib/supabase';
 import { generateUuidV4 } from '@/lib/uuid';
 
+/** Maps directly to posts.visibility — see VisibilityPicker for the
+ * plain-English labels shown for each. */
+export type PostVisibility = 'public' | 'followers' | 'league_only' | 'hidden';
+
 export interface CatchPhotoInput {
   prepared: PreparedCatchPhoto;
   role: MediaRole;
@@ -14,6 +18,7 @@ export interface SubmitCatchInput {
   venueId: string | null;
   newVenueName: string | null;
   venueHidden: boolean;
+  visibility: PostVisibility;
   photos: CatchPhotoInput[];
 }
 
@@ -66,6 +71,7 @@ export async function submitCatch(input: SubmitCatchInput): Promise<SubmitCatchR
     p_venue_hidden: input.venueHidden,
     p_photos: photosPayload,
     p_post_id: postId,
+    p_visibility: input.visibility,
   });
 
   if (error) {

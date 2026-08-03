@@ -1,6 +1,8 @@
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { FollowButton } from '@/components/follow-button';
 import { Radii, Shadows, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { FeedItemWithPhoto } from '@/lib/feed';
@@ -8,10 +10,15 @@ import { formatWeightOz } from '@/lib/units';
 
 type PostCardProps = {
   item: FeedItemWithPhoto;
+  /** Null while the viewer is still loading — the follow button hides
+   * rather than guessing in that window. */
+  viewerId: string | null;
+  followingIds: Set<string>;
 };
 
-export function PostCard({ item }: PostCardProps) {
+export function PostCard({ item, viewerId, followingIds }: PostCardProps) {
   const theme = useTheme();
+  const router = useRouter();
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(item.like_count);
 
@@ -20,15 +27,23 @@ export function PostCard({ item }: PostCardProps) {
     setLiked((prev) => !prev);
   };
 
+  const isSelf = viewerId === item.author_id;
+  const goToProfile = () => router.push({ pathname: '/profile/[id]', params: { id: item.author_id } });
+
   return (
     <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }, Shadows.card]}>
       <View style={styles.header}>
-        {item.avatar_path ? (
-          <Image source={{ uri: item.avatar_path }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, { backgroundColor: theme.surfaceElevated }]} />
+        <Pressable onPress={goToProfile} style={styles.headerIdentity} hitSlop={Spacing.one}>
+          {item.avatar_path ? (
+            <Image source={{ uri: item.avatar_path }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: theme.surfaceElevated }]} />
+          )}
+          <Text style={[Typography.h3, { color: theme.text }]}>{item.username}</Text>
+        </Pressable>
+        {viewerId !== null && !isSelf && (
+          <FollowButton anglerId={item.author_id} initialIsFollowing={followingIds.has(item.author_id)} size="small" />
         )}
-        <Text style={[Typography.h3, { color: theme.text }]}>{item.username}</Text>
       </View>
 
       <View style={styles.photoWrapper}>
@@ -79,8 +94,15 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: Spacing.two,
     padding: Spacing.three,
+  },
+  headerIdentity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    flex: 1,
   },
   avatar: {
     width: Spacing.five,

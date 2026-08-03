@@ -18,6 +18,7 @@ import { CatchResultCard } from '@/components/catch-result-card';
 import { FormField } from '@/components/form-field';
 import { PhotoRoleStrip, type PhotoStripItem } from '@/components/photo-role-strip';
 import { VenuePicker, type VenueSelection } from '@/components/venue-picker';
+import { VisibilityPicker } from '@/components/visibility-picker';
 import { MaxContentWidth, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -31,7 +32,7 @@ import {
 } from '@/lib/catchPhoto';
 import { fetchCatchResult, type CatchResultData } from '@/lib/catchResult';
 import { computePoints, fetchSeasonForDate, type SeasonScoring } from '@/lib/scoring';
-import { DuplicateImageError, submitCatch, type SubmitCatchResult } from '@/lib/submitCatch';
+import { DuplicateImageError, submitCatch, type PostVisibility, type SubmitCatchResult } from '@/lib/submitCatch';
 import { toWeightOz } from '@/lib/units';
 import { generateUuidV4 } from '@/lib/uuid';
 import { useAuth } from '@/providers/auth-provider';
@@ -69,6 +70,7 @@ export default function LogCatchScreen() {
   const [timeText, setTimeText] = useState(() => formatTimeInput(new Date()));
   const [venue, setVenue] = useState<VenueSelection | null>(null);
   const [venueHidden, setVenueHidden] = useState(false);
+  const [visibility, setVisibility] = useState<PostVisibility>('public');
   const [caption, setCaption] = useState('');
   const [season, setSeason] = useState<SeasonScoring | null>(null);
 
@@ -208,6 +210,7 @@ export default function LogCatchScreen() {
         venueId: venue?.venueId ?? null,
         newVenueName: venue?.isNew ? venue.venueName : null,
         venueHidden,
+        visibility,
         photos: readyPhotos.map((p) => ({ prepared: p.prepared!, role: p.role })),
       });
       setResult(submitResult);
@@ -241,6 +244,7 @@ export default function LogCatchScreen() {
     setTimeText(formatTimeInput(now));
     setVenue(null);
     setVenueHidden(false);
+    setVisibility('public');
     setCaption('');
     setResult(null);
     setCatchResultData(null);
@@ -368,6 +372,8 @@ export default function LogCatchScreen() {
               </View>
             </View>
           </View>
+
+          <VisibilityPicker value={visibility} onChange={setVisibility} />
 
           <VenuePicker
             selection={venue}

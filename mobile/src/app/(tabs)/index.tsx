@@ -9,10 +9,12 @@ import { BottomTabInset, ButtonVariants, MaxContentWidth, Spacing, Typography } 
 import { useTheme } from '@/hooks/use-theme';
 import { fetchFeedPage, type FeedItemWithPhoto, type FeedTab } from '@/lib/feed';
 import { getLastFeedTab, setLastFeedTab } from '@/lib/feedTabPreference';
-import { hasAnySeasonEntry } from '@/lib/follows';
+import { fetchFollowingIds, hasAnySeasonEntry } from '@/lib/follows';
+import { useAuth } from '@/providers/auth-provider';
 
 export default function HomeScreen() {
   const theme = useTheme();
+  const { session } = useAuth();
   const [tab, setTab] = useState<FeedTab | null>(null);
   const [showLeagueTab, setShowLeagueTab] = useState(false);
   const [items, setItems] = useState<FeedItemWithPhoto[]>([]);
@@ -21,6 +23,11 @@ export default function HomeScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    fetchFollowingIds().then(setFollowingIds);
+  }, []);
 
   // Resolve the starting tab once: the persisted preference, unless it was
   // "league" and this angler turns out to have no season_entries row to
@@ -119,7 +126,9 @@ export default function HomeScreen() {
         <FlatList
           data={items}
           keyExtractor={(item) => item.post_id}
-          renderItem={({ item }) => <PostCard item={item} />}
+          renderItem={({ item }) => (
+            <PostCard item={item} viewerId={session?.user.id ?? null} followingIds={followingIds} />
+          )}
           style={styles.list}
           contentContainerStyle={styles.listContent}
           onEndReached={loadMore}

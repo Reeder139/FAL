@@ -25,6 +25,107 @@ export async function unfollowAngler(followeeId: string): Promise<void> {
   if (error) throw error;
 }
 
+/** followee_ids the signed-in angler follows, as a Set for O(1) lookup —
+ * fetched once per feed load and passed down to PostCard, rather than each
+ * card querying its own follow state (N+1). */
+export async function fetchFollowingIds(): Promise<Set<string>> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return new Set();
+
+  const { data } = await supabase.from('follows').select('followee_id').eq('follower_id', user.id);
+  return new Set((data ?? []).map((f) => f.followee_id));
+}
+
+export interface AnglerProfile {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  declaredPbOz: number | null;
+  pbVerified: boolean;
+  followerCount: number;
+  followingCount: number;
+  isSelf: boolean;
+  isFollowing: boolean;
+}
+
+/** Profile + counts + relationship-to-viewer, for viewing another angler's
+ * profile (or your own via the same screen — isSelf tells the UI to hide
+ * the follow button). */
+export async function fetchAnglerProfile(anglerId: string): Promise<AnglerProfile | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [{ data: profile }, { data: followRow }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, username, display_name, avatar_path, declared_pb_oz, pb_verified, follower_count, following_count')
+      .eq('id', anglerId)
+      .maybeSingle(),
+    user && user.id !== anglerId
+      ? supabase
+          .from('follows')
+          .select('follower_id')
+          .eq('follower_id', user.id)
+          .eq('followee_id', anglerId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  if (!profile) return null;
+
+  return {
+    id: profile.id,
+    username: profile.username,
+    displayName: profile.display_name,
+    avatarUrl: profile.avatar_path ? getPublicStorageUrl('post-media', profile.avatar_path) : null,
+    declaredPbOz: profile.declared_pb_oz,
+    pbVerified: profile.pb_verified,
+    followerCount: profile.follower_count,
+    followingCount: profile.following_count,
+    isSelf: user?.id === anglerId,
+    isFollowing: !!followRow,
+  };
+}
+
+export type FollowListKind = 'followers' | 'following';
+
+export interface FollowListEntry {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+/** The people who follow `anglerId` (kind: 'followers'), or the people
+ * `anglerId` follows (kind: 'following') — for the tap-through list from
+ * the follower/following counts on a profile. */
+export async function fetchFollowList(anglerId: string, kind: FollowListKind): Promise<FollowListEntry[]> {
+  const column = kind === 'followers' ? 'follower_id' : 'followee_id';
+  const filterColumn = kind === 'followers' ? 'followee_id' : 'follower_id';
+
+  const { data: rows, error } = await supabase.from('follows').select(column).eq(filterColumn, anglerId);
+  if (error) throw error;
+
+  const ids = (rows ?? []).map((r) => (r as unknown as Record<string, string>)[column]);
+  if (ids.length === 0) return [];
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, username, display_name, avatar_path')
+    .in('id', ids);
+  if (profilesError) throw profilesError;
+
+  return (profiles ?? []).map((p) => ({
+    id: p.id,
+    username: p.username,
+    displayName: p.display_name,
+    avatarUrl: p.avatar_path ? getPublicStorageUrl('post-media', p.avatar_path) : null,
+  }));
+}
+
 /** True if the signed-in angler has at least one season_entries row, ever
  * — used to decide whether the "My League" feed tab should show at all. */
 export async function hasAnySeasonEntry(): Promise<boolean> {
