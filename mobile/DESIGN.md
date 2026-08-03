@@ -26,6 +26,7 @@ bright cyan reads poorly on a white background.
 | Mist | `#A9B8C9` | Secondary text |
 | Slate Muted | `#6E7F94` | Tertiary/meta text |
 | **Angler Cyan** | `#22D3EE` | Primary accent — logo, active tab, primary buttons, progress rings, links |
+| Ink Navy | `#0F2A43` | `onPrimaryStrong` — dark text on primary-colored surfaces (League summary strip); cyan is too bright for white text |
 | Cyan Mist | `#67E0F2` | Uppercase eyebrow labels ("YOUR RANK") |
 | Deep Cyan | `#0E93AD` | Primary button pressed/gradient-end state |
 | **Royal Purple** | `#8B5CF6` | Secondary accent — Division 2, vote/social CTAs |
@@ -45,7 +46,7 @@ bright cyan reads poorly on a white background.
 | Cloud White | `#F4F8FC` | App background |
 | Pure White | `#FFFFFF` | Card backgrounds |
 | Border Light | `#DCE6F0` | Card hairline strokes |
-| Ink Navy | `#0F2A43` | Primary text |
+| Ink Navy | `#0F2A43` | Primary text; also `onPrimaryStrong` on primary-colored surfaces |
 | Slate | `#5B6B7C` | Secondary text |
 | **Ocean Blue** | `#1E88E5` | Primary accent (replaces cyan in light mode) |
 | Ocean Blue Deep | `#125EA3` | Pressed state, uppercase labels |

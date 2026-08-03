@@ -58,8 +58,8 @@ export function LeagueStrip({ summary }: LeagueStripProps) {
   return (
     <Pressable
       onPress={() => router.push('/league')}
-      style={[styles.container, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-      <Text style={[Typography.bodySmall, { color: theme.text }]} numberOfLines={1}>
+      style={[styles.container, { backgroundColor: theme.primary, borderColor: theme.primary }]}>
+      <Text style={[Typography.bodySmall, { color: theme.onPrimaryStrong }]} numberOfLines={1}>
         {summaryText(summary)}
       </Text>
     </Pressable>

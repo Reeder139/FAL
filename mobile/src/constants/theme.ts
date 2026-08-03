@@ -95,6 +95,10 @@ export const Colors = {
     primary: Palette.anglerCyan,
     primaryPressed: Palette.deepCyan,
     onPrimary: Palette.pureWhite,
+    /** Dark-navy text for surfaces filled with `primary` — anglerCyan is
+     * bright enough that white text reads poorly on it (see the League
+     * summary strip). */
+    onPrimaryStrong: Palette.inkNavy,
 
     secondary: Palette.royalPurple,
     secondaryPressed: Palette.deepViolet,
@@ -129,6 +133,7 @@ export const Colors = {
     primary: Palette.oceanBlue,
     primaryPressed: Palette.oceanBlueDeep,
     onPrimary: Palette.pureWhite,
+    onPrimaryStrong: Palette.inkNavy,
 
     secondary: Palette.royalPurple,
     secondaryPressed: Palette.deepViolet,
