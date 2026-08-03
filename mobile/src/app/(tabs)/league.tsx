@@ -1,5 +1,6 @@
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomTabInset, MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
@@ -11,10 +12,13 @@ const DIVISION_COLOR_KEYS = ['divisionOne', 'divisionTwo', 'divisionThree'] as c
 
 function DivisionCard({ division, index }: { division: DivisionOverview; index: number }) {
   const theme = useTheme();
+  const router = useRouter();
   const accent = theme[DIVISION_COLOR_KEYS[index % DIVISION_COLOR_KEYS.length]];
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.surface, borderColor: accent }]}>
+    <Pressable
+      onPress={() => router.push({ pathname: '/division/[id]', params: { id: division.id } })}
+      style={[styles.card, { backgroundColor: theme.surface, borderColor: accent }]}>
       <View style={styles.cardHeader}>
         <View style={[styles.rankBadge, { backgroundColor: accent }]}>
           <Text style={[Typography.h2, { color: theme.onPrimary }]}>{division.rank}</Text>
@@ -44,7 +48,7 @@ function DivisionCard({ division, index }: { division: DivisionOverview; index: 
           </Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

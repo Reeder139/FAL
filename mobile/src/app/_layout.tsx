@@ -21,6 +21,10 @@ export default function RootLayout() {
            * bar is naturally hidden while it's open — same pattern any
            * future full-screen view (post detail, etc.) should follow. */}
           <Stack.Screen name="log-catch" options={{ presentation: 'modal' }} />
+          {/* Default push (not modal) — it has its own back arrow, drilling
+           * down from a division card on /league rather than presenting as
+           * a sheet. */}
+          <Stack.Screen name="division/[id]" />
         </Stack>
       </AuthProvider>
     </ThemeProvider>

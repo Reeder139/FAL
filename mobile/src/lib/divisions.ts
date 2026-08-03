@@ -317,3 +317,125 @@ export async function fetchDivisionLeaders(): Promise<DivisionLeadersOverview | 
 
   return { seasonName: season.name, divisions };
 }
+
+export interface StandingRow {
+  anglerId: string;
+  rank: number;
+  displayName: string;
+  username: string;
+  avatarUrl: string | null;
+  identityVerified: boolean;
+  points: number;
+  countingFish: number;
+  heaviestOz: number | null;
+  avgWeightOz: number | null;
+  isYou: boolean;
+}
+
+export interface DivisionStandings {
+  divisionId: string;
+  divisionName: string;
+  rank: number;
+  minPbOz: number | null;
+  maxPbOz: number | null;
+  seasonName: string;
+  memberCount: number;
+  rows: StandingRow[];
+}
+
+/**
+ * Full ranked standings for a single division, for the drill-down page
+ * reached by tapping a division card on /league. Unlike
+ * fetchDivisionLeaders (which only needs the #1 angler per division, so a
+ * per-division fan-out is fine), this needs every row, so avg weight is
+ * computed from one bulk scored_catches query grouped client-side rather
+ * than one query per angler.
+ */
+export async function fetchDivisionStandings(divisionId: string): Promise<DivisionStandings | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: division } = await supabase
+    .from('divisions')
+    .select('id, name, rank, min_pb_oz, max_pb_oz, season_id')
+    .eq('id', divisionId)
+    .maybeSingle();
+  if (!division) return null;
+
+  const { data: season } = await supabase
+    .from('seasons')
+    .select('name, counting_fish')
+    .eq('id', division.season_id)
+    .maybeSingle();
+
+  const [{ data: tableRows }, { count: memberCount }] = await Promise.all([
+    supabase
+      .from('league_table')
+      .select('angler_id, total_points, counting_fish, best_fish_oz, position')
+      .eq('season_id', division.season_id)
+      .eq('division_id', divisionId)
+      .order('position'),
+    supabase
+      .from('season_entries')
+      .select('id', { count: 'exact', head: true })
+      .eq('season_id', division.season_id)
+      .eq('division_id', divisionId),
+  ]);
+
+  const base = {
+    divisionId,
+    divisionName: division.name,
+    rank: division.rank,
+    minPbOz: division.min_pb_oz,
+    maxPbOz: division.max_pb_oz,
+    seasonName: season?.name ?? '',
+    memberCount: memberCount ?? 0,
+  };
+  if (!tableRows || tableRows.length === 0) return { ...base, rows: [] };
+
+  const anglerIds = tableRows.map((r) => r.angler_id);
+  const [{ data: profiles }, { data: countingCatches }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, username, display_name, avatar_path, identity_verified')
+      .in('id', anglerIds),
+    supabase
+      .from('scored_catches')
+      .select('angler_id, weight_oz')
+      .eq('season_id', division.season_id)
+      .eq('division_id', divisionId)
+      .lte('rank_in_season', season?.counting_fish ?? 1),
+  ]);
+
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+  const weightsByAngler = new Map<string, number[]>();
+  for (const c of countingCatches ?? []) {
+    const arr = weightsByAngler.get(c.angler_id) ?? [];
+    arr.push(c.weight_oz);
+    weightsByAngler.set(c.angler_id, arr);
+  }
+
+  const rows: StandingRow[] = tableRows.map((r) => {
+    const profile = profileMap.get(r.angler_id);
+    const weights = weightsByAngler.get(r.angler_id) ?? [];
+    const avgWeightOz =
+      weights.length > 0 ? Math.round(weights.reduce((sum, w) => sum + w, 0) / weights.length) : null;
+
+    return {
+      anglerId: r.angler_id,
+      rank: r.position,
+      displayName: profile?.display_name ?? '—',
+      username: profile?.username ?? '',
+      avatarUrl: profile?.avatar_path ? getPublicStorageUrl('post-media', profile.avatar_path) : null,
+      identityVerified: profile?.identity_verified ?? false,
+      points: r.total_points,
+      countingFish: r.counting_fish,
+      heaviestOz: r.best_fish_oz,
+      avgWeightOz,
+      isYou: r.angler_id === user?.id,
+    };
+  });
+
+  return { ...base, rows };
+}
