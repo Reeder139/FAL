@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { FormField } from '@/components/form-field';
 import { Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { searchVenues, type Venue } from '@/lib/venues';
+import { findSimilarVenues, searchVenues, type Venue } from '@/lib/venues';
 
 export interface VenueSelection {
   venueId: string | null;
@@ -25,6 +25,8 @@ export function VenuePicker({ selection, onChange, venueHidden, onChangeVenueHid
   const [results, setResults] = useState<Venue[]>([]);
   const [searching, setSearching] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [duplicateCandidates, setDuplicateCandidates] = useState<Venue[] | null>(null);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
 
   useEffect(() => {
     if (selection || query.trim().length < 2) {
@@ -45,20 +47,40 @@ export function VenuePicker({ selection, onChange, venueHidden, onChangeVenueHid
   const handleSelectResult = (venue: Venue) => {
     onChange({ venueId: venue.id, venueName: venue.name, isNew: false });
     setQuery(venue.name);
+    setDuplicateCandidates(null);
     setFocused(false);
   };
 
-  const handleAddNew = () => {
+  const handleAddNewPress = async () => {
+    const name = query.trim();
+    setCheckingDuplicates(true);
+    try {
+      const candidates = await findSimilarVenues(name);
+      if (candidates.length > 0) {
+        setDuplicateCandidates(candidates);
+        return;
+      }
+    } finally {
+      setCheckingDuplicates(false);
+    }
+    onChange({ venueId: null, venueName: name, isNew: true });
+    setFocused(false);
+  };
+
+  const handleAddAnyway = () => {
     onChange({ venueId: null, venueName: query.trim(), isNew: true });
+    setDuplicateCandidates(null);
     setFocused(false);
   };
 
   const handleChangeText = (text: string) => {
     setQuery(text);
+    setDuplicateCandidates(null);
     if (selection) onChange(null);
   };
 
-  const showDropdown = focused && !selection && query.trim().length >= 2;
+  const showDupeCheck = focused && !selection && duplicateCandidates !== null;
+  const showDropdown = focused && !selection && duplicateCandidates === null && query.trim().length >= 2;
 
   return (
     <View style={styles.container}>
@@ -88,8 +110,35 @@ export function VenuePicker({ selection, onChange, venueHidden, onChangeVenueHid
               )}
             </Pressable>
           ))}
-          <Pressable onPress={handleAddNew} style={styles.dropdownRow}>
-            <Text style={[Typography.body, { color: theme.primary }]}>Add “{query.trim()}” as a new venue</Text>
+          <Pressable onPress={handleAddNewPress} style={styles.dropdownRow} disabled={checkingDuplicates}>
+            {checkingDuplicates ? (
+              <ActivityIndicator size="small" color={theme.primary} />
+            ) : (
+              <Text style={[Typography.body, { color: theme.primary }]}>
+                Add “{query.trim()}” as a new venue
+              </Text>
+            )}
+          </Pressable>
+        </View>
+      )}
+
+      {showDupeCheck && (
+        <View style={[styles.dropdown, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}>
+          <Text style={[Typography.label, { color: theme.label, padding: Spacing.three, paddingBottom: 0 }]}>
+            Did you mean one of these?
+          </Text>
+          {duplicateCandidates?.map((venue) => (
+            <Pressable key={venue.id} onPress={() => handleSelectResult(venue)} style={styles.dropdownRow}>
+              <Text style={[Typography.body, { color: theme.text }]}>{venue.name}</Text>
+              {venue.county && (
+                <Text style={[Typography.caption, { color: theme.textMuted }]}>{venue.county}</Text>
+              )}
+            </Pressable>
+          ))}
+          <Pressable onPress={handleAddAnyway} style={styles.dropdownRow}>
+            <Text style={[Typography.body, { color: theme.primary }]}>
+              No, add “{query.trim()}” as a new venue
+            </Text>
           </Pressable>
         </View>
       )}
