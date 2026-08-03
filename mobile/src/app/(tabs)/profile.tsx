@@ -1,7 +1,7 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ButtonVariants, Radii, Spacing, Typography } from '@/constants/theme';
+import { ButtonVariants, MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/providers/auth-provider';
 import { getPublicStorageUrl } from '@/lib/storage';
@@ -34,7 +34,9 @@ export default function ProfileScreen() {
               {formatWeightOz(profile.declared_pb_oz)}
             </Text>
             <Text style={[Typography.caption, { color: theme.textMuted }]}>
-              {profile.pb_verified ? 'Verified' : 'Unverified — seeded into Division 1'}
+              {profile.pb_verified
+                ? 'Verified'
+                : 'Unverified — an evidence-backed PB can move you into an easier division'}
             </Text>
           </View>
         )}
@@ -65,6 +67,9 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
     alignItems: 'center',
     paddingTop: Spacing.six,
     paddingHorizontal: Spacing.four,
