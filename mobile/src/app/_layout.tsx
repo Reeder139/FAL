@@ -18,13 +18,12 @@ export default function RootLayout() {
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="onboarding" />
           {/* Presented as a modal, outside the tabs navigator, so the tab
-           * bar is naturally hidden while it's open — same pattern any
-           * future full-screen view (post detail, etc.) should follow. */}
+           * bar is naturally hidden while it's open — reserved for focused
+           * single-task flows like this one. New content/drill-down pages
+           * should NOT follow this pattern: nest them inside the relevant
+           * tab's own stack instead (see (tabs)/league/_layout.tsx) so the
+           * tab bar and Catch FAB stay visible everywhere else. */}
           <Stack.Screen name="log-catch" options={{ presentation: 'modal' }} />
-          {/* Default push (not modal) — it has its own back arrow, drilling
-           * down from a division card on /league rather than presenting as
-           * a sheet. */}
-          <Stack.Screen name="division/[id]" />
         </Stack>
       </AuthProvider>
     </ThemeProvider>

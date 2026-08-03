@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   fetchDivisionStandings,
@@ -91,7 +91,7 @@ export default function DivisionStandingsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
           <View style={styles.header}>
             <Pressable onPress={() => router.back()} style={[styles.backButton, { backgroundColor: theme.surface }]}>
@@ -210,8 +210,8 @@ const styles = StyleSheet.create({
     gap: Spacing.half,
   },
   list: {
-    gap: Spacing.two,
-    paddingBottom: Spacing.four,
+    gap: Spacing.one,
+    paddingBottom: BottomTabInset + Spacing.four,
   },
   row: {
     flexDirection: 'row',

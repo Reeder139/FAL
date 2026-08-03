@@ -18,7 +18,7 @@ function DivisionCard({ division, index }: { division: DivisionOverview; index: 
 
   return (
     <Pressable
-      onPress={() => router.push({ pathname: '/division/[id]', params: { id: division.id } })}
+      onPress={() => router.push({ pathname: '/league/[id]', params: { id: division.id } })}
       style={[styles.card, { backgroundColor: theme.surface, borderColor: accent }]}>
       <View style={styles.cardHeader}>
         <View style={[styles.rankBadge, { backgroundColor: accent }]}>
