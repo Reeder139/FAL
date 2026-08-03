@@ -3,6 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { AppLogo } from '@/components/app-logo';
 import { AuthProvider } from '@/providers/auth-provider';
 
 SplashScreen.preventAutoHideAsync();
@@ -25,6 +26,7 @@ export default function RootLayout() {
            * tab bar and Catch FAB stay visible everywhere else. */}
           <Stack.Screen name="log-catch" options={{ presentation: 'modal' }} />
         </Stack>
+        <AppLogo />
       </AuthProvider>
     </ThemeProvider>
   );
