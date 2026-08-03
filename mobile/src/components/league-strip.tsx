@@ -1,9 +1,11 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { LeagueSummary } from '@/lib/leagueSummary';
+
+const LOGO_SIZE = 32;
 
 // TODO: real trend delta once we have standings history to diff against —
 // hardcoded placeholder for now, per the design ask.
@@ -65,18 +67,29 @@ export function LeagueStrip({ summary }: LeagueStripProps) {
           {summaryText(summary)}
         </Text>
       </View>
+      <Image source={require('@/assets/images/logo.jpg')} style={styles.logo} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
     borderBottomWidth: 1,
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
     borderRadius: Radii.xs,
   },
   textGroup: {
+    flex: 1,
     gap: Spacing.half,
+  },
+  logo: {
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
+    borderRadius: Radii.sm,
   },
 });
