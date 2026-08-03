@@ -166,3 +166,11 @@ This mapping is used consistently everywhere a division or rank appears
 
 Don't invent new division colors per screen — always pull `divisionOne` /
 `divisionTwo` / `divisionThree` from `Colors`.
+
+## Layout
+
+| Token | Value | Used for |
+|---|---|---|
+| `MaxContentWidth` | 800 | Content column cap on wide/web viewports — every screen centers within this instead of stretching edge to edge |
+| `BottomTabInset` | 50 (iOS) / 80 (Android) / 0 (web) | Extra bottom padding on scrollable content so it clears the native tab bar |
+| `SuggestedFollowsRailHeight` | 156 | Feed's suggested-follows rail — roughly 3x the League Position strip's own height |

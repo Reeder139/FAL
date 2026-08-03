@@ -4,27 +4,13 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { LeagueSummary } from '@/lib/leagueSummary';
+import { ordinal } from '@/lib/units';
 
 const LOGO_SIZE = 32;
 
 // TODO: real trend delta once we have standings history to diff against —
 // hardcoded placeholder for now, per the design ask.
 const PLACEHOLDER_DELTA = '▲3';
-
-function ordinal(n: number): string {
-  const v = n % 100;
-  if (v >= 11 && v <= 13) return `${n}th`;
-  switch (n % 10) {
-    case 1:
-      return `${n}st`;
-    case 2:
-      return `${n}nd`;
-    case 3:
-      return `${n}rd`;
-    default:
-      return `${n}th`;
-  }
-}
 
 function summaryText(summary: LeagueSummary): string {
   switch (summary.kind) {

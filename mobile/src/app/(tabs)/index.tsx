@@ -4,6 +4,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 import { FeedTabs } from '@/components/feed-tabs';
 import { PostCard } from '@/components/post-card';
 import { SuggestedAnglersList } from '@/components/suggested-anglers';
+import { SuggestedFollowsRail } from '@/components/suggested-follows-rail';
 import { TabScreen } from '@/components/tab-screen';
 import { BottomTabInset, ButtonVariants, MaxContentWidth, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -83,6 +84,8 @@ export default function HomeScreen() {
 
   return (
     <TabScreen centered>
+      <SuggestedFollowsRail />
+
       {tab && (
         <View style={styles.tabsWrapper}>
           <FeedTabs value={tab} onChange={handleTabChange} showLeagueTab={showLeagueTab} />

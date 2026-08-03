@@ -371,3 +371,6 @@ export const InputStyle = {
 // ---------------------------------------------------------------------------
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+/** Suggested-follows rail on the feed — roughly 3x the League Position
+ * strip's own height (~52px: two text lines + vertical padding). */
+export const SuggestedFollowsRailHeight = 156;
