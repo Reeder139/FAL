@@ -2,18 +2,16 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { LeagueStrip } from '@/components/league-strip';
+import { LeagueStripBar } from '@/components/league-strip-bar';
 import { PostCard } from '@/components/post-card';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { fetchLeagueSummary, type LeagueSummary } from '@/lib/leagueSummary';
 import { getFeedItems, type FeedItemWithPhoto } from '@/lib/mockFeed';
 
 export default function HomeScreen() {
   const theme = useTheme();
   const [items, setItems] = useState<FeedItemWithPhoto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [leagueSummary, setLeagueSummary] = useState<LeagueSummary | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -23,13 +21,6 @@ export default function HomeScreen() {
         setLoading(false);
       }
     });
-    fetchLeagueSummary()
-      .then((summary) => {
-        if (!cancelled) setLeagueSummary(summary);
-      })
-      .catch(() => {
-        if (!cancelled) setLeagueSummary(null);
-      });
     return () => {
       cancelled = true;
     };
@@ -42,11 +33,7 @@ export default function HomeScreen() {
          * collapsing on scroll direction, which felt like the less
          * intrusive of the two options: a static strip doesn't compete for
          * attention with its own motion. */}
-        {leagueSummary && (
-          <View style={styles.stripWrapper}>
-            <LeagueStrip summary={leagueSummary} />
-          </View>
-        )}
+        <LeagueStripBar />
 
         {loading ? (
           <ActivityIndicator color={theme.primary} />
@@ -71,10 +58,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     alignItems: 'center',
-  },
-  stripWrapper: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
   },
   list: {
     width: '100%',

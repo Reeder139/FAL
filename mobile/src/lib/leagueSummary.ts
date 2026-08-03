@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 import { supabase } from '@/lib/supabase';
 
 export type LeagueSummary =
@@ -94,4 +96,26 @@ export async function fetchLeagueSummary(): Promise<LeagueSummary | null> {
     divisionMemberCount: hyp.division_member_count,
     divisionName: hyp.division_name,
   };
+}
+
+/** Shared by every tab screen that renders the League strip in its header,
+ * so the fetch-on-mount boilerplate lives in one place. */
+export function useLeagueSummary(): LeagueSummary | null {
+  const [summary, setSummary] = useState<LeagueSummary | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchLeagueSummary()
+      .then((data) => {
+        if (!cancelled) setSummary(data);
+      })
+      .catch(() => {
+        if (!cancelled) setSummary(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return summary;
 }

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LeagueStripBar } from '@/components/league-strip-bar';
 import { BottomTabInset, MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -126,6 +127,8 @@ export default function LeadersScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <SafeAreaView style={styles.safeArea}>
+        <LeagueStripBar />
+
         {loading ? (
           <ActivityIndicator color={theme.primary} style={styles.loading} />
         ) : !overview ? (
