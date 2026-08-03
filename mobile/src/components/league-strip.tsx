@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -59,9 +59,12 @@ export function LeagueStrip({ summary }: LeagueStripProps) {
     <Pressable
       onPress={() => router.push('/league')}
       style={[styles.container, { backgroundColor: theme.primary, borderColor: theme.primary }]}>
-      <Text style={[Typography.bodySmall, { color: theme.onPrimaryStrong }]} numberOfLines={1}>
-        {summaryText(summary)}
-      </Text>
+      <View style={styles.textGroup}>
+        <Text style={[Typography.label, { color: theme.onPrimaryStrong }]}>Your Current League Position</Text>
+        <Text style={[Typography.bodySmall, { color: theme.onPrimaryStrong }]} numberOfLines={1}>
+          {summaryText(summary)}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -72,5 +75,8 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
     borderRadius: Radii.xs,
+  },
+  textGroup: {
+    gap: Spacing.half,
   },
 });
