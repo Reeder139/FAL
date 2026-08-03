@@ -2,21 +2,22 @@ import { supabase } from '@/lib/supabase';
 
 export type LeagueSummary =
   | { kind: 'no_catches' }
+  | { kind: 'no_active_season' }
   | { kind: 'member'; divisionName: string; position: number | null; divisionMemberCount: number; points: number }
   | { kind: 'free'; points: number; position: number | null; divisionMemberCount: number; divisionName: string | null };
 
 /**
- * Drives the league summary strip. Three states, checked in this order:
+ * Drives the league summary strip. Checked in this order:
  * 1. No catches at all yet (regardless of membership) -> neutral prompt.
- * 2. Has a season_entries row for the current season -> read straight from
+ * 2. Has catches, but no season is currently open/running -> its own
+ *    message. This must NOT fall back to "no_catches" — that's actively
+ *    wrong when the angler has genuinely logged something; it just isn't
+ *    scoreable against anything right now.
+ * 3. Has a season_entries row for the current season -> read straight from
  *    league_table (position/points come from real standings).
- * 3. No season_entries row -> hypothetical_league_position, the same
+ * 4. No season_entries row -> hypothetical_league_position, the same
  *    "mirror the real scoring without requiring a row" approach the catch
  *    result card uses for hypothetical_catch_preview.
- *
- * If there's no active season right now at all, this also falls back to
- * the "no_catches" message — there's nothing seasonal to summarize either
- * way, and inventing a fourth UI state for that wasn't asked for.
  */
 export async function fetchLeagueSummary(): Promise<LeagueSummary | null> {
   const {
@@ -40,7 +41,7 @@ export async function fetchLeagueSummary(): Promise<LeagueSummary | null> {
     .order('starts_on', { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (!season) return { kind: 'no_catches' };
+  if (!season) return { kind: 'no_active_season' };
 
   const { data: entry } = await supabase
     .from('season_entries')
@@ -81,7 +82,10 @@ export async function fetchLeagueSummary(): Promise<LeagueSummary | null> {
 
   const { data: hypRows } = await supabase.rpc('hypothetical_league_position', { p_angler_id: user.id });
   const hyp = hypRows?.[0];
-  if (!hyp) return { kind: 'no_catches' };
+  // A season exists, but no division matches this angler's declared PB —
+  // a data-configuration gap (divisions should cover the full range), not
+  // "no catches". Closest existing state: nothing seasonal to show.
+  if (!hyp) return { kind: 'no_active_season' };
 
   return {
     kind: 'free',

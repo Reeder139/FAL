@@ -28,6 +28,8 @@ function summaryText(summary: LeagueSummary): string {
   switch (summary.kind) {
     case 'no_catches':
       return 'Log your first catch to start scoring';
+    case 'no_active_season':
+      return "No season is open right now — you'll see your score once one starts";
     case 'member': {
       const parts = [summary.divisionName];
       if (summary.position !== null) parts.push(`${ordinal(summary.position)} of ${summary.divisionMemberCount}`);
