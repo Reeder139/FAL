@@ -15,7 +15,17 @@ export interface DivisionOverview {
 
 export interface LeagueOverview {
   seasonName: string;
-  yourDeclaredPbOz: number | null;
+  /** declared_pb_oz vs. best verified catch, whichever is higher — the PB
+   * grows automatically as an angler lands bigger verified fish, it isn't
+   * fixed at whatever was declared during onboarding. Null if neither
+   * exists. */
+  currentPbOz: number | null;
+  /** Which of this season's divisions currentPbOz would seed into — used
+   * as the reseed preview. There's only ever one season's division
+   * structure to reference (no "next season" object exists yet), so this
+   * uses the current one as a proxy; division PB ranges aren't expected to
+   * change season to season. */
+  nextDivisionName: string | null;
   divisions: DivisionOverview[];
 }
 
@@ -27,6 +37,18 @@ export function formatPbRange(minPbOz: number | null, maxPbOz: number | null): s
     return `${Math.floor(minPbOz / 16)}–${Math.ceil((maxPbOz + 1) / 16)}lb`;
   }
   return 'All weights';
+}
+
+function findDivisionForPb<T extends { minPbOz: number | null; maxPbOz: number | null }>(
+  pbOz: number | null,
+  divisions: T[]
+): T | null {
+  if (pbOz === null) return null;
+  return (
+    divisions.find(
+      (d) => (d.minPbOz === null || pbOz >= d.minPbOz) && (d.maxPbOz === null || pbOz <= d.maxPbOz)
+    ) ?? null
+  );
 }
 
 /**
@@ -53,8 +75,17 @@ export async function fetchLeagueOverview(): Promise<LeagueOverview | null> {
     .maybeSingle();
   if (!season) return null;
 
-  const [{ data: profile }, { data: divisionsRaw }] = await Promise.all([
+  const [{ data: profile }, { data: bestCatch }, { data: divisionsRaw }] = await Promise.all([
     supabase.from('profiles').select('declared_pb_oz').eq('id', user.id).maybeSingle(),
+    // Same "best verified catch" comparison submit_catch uses to decide is_pb.
+    supabase
+      .from('catches')
+      .select('weight_oz')
+      .eq('angler_id', user.id)
+      .eq('status', 'verified')
+      .order('weight_oz', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     supabase
       .from('divisions')
       .select('id, name, rank, min_pb_oz, max_pb_oz')
@@ -63,6 +94,11 @@ export async function fetchLeagueOverview(): Promise<LeagueOverview | null> {
   ]);
 
   const declaredPbOz = profile?.declared_pb_oz ?? null;
+  const bestVerifiedOz = bestCatch?.weight_oz ?? null;
+  const currentPbOz =
+    declaredPbOz === null && bestVerifiedOz === null
+      ? null
+      : Math.max(declaredPbOz ?? 0, bestVerifiedOz ?? 0);
 
   const divisions = await Promise.all(
     (divisionsRaw ?? []).map(async (d): Promise<DivisionOverview> => {
@@ -83,9 +119,9 @@ export async function fetchLeagueOverview(): Promise<LeagueOverview | null> {
       ]);
 
       const isYourDivision =
-        declaredPbOz !== null &&
-        (d.min_pb_oz === null || declaredPbOz >= d.min_pb_oz) &&
-        (d.max_pb_oz === null || declaredPbOz <= d.max_pb_oz);
+        currentPbOz !== null &&
+        (d.min_pb_oz === null || currentPbOz >= d.min_pb_oz) &&
+        (d.max_pb_oz === null || currentPbOz <= d.max_pb_oz);
 
       return {
         id: d.id,
@@ -100,5 +136,15 @@ export async function fetchLeagueOverview(): Promise<LeagueOverview | null> {
     })
   );
 
-  return { seasonName: season.name, yourDeclaredPbOz: declaredPbOz, divisions };
+  const nextDivision = findDivisionForPb(
+    currentPbOz,
+    divisions.map((d) => ({ minPbOz: d.minPbOz, maxPbOz: d.maxPbOz, name: d.name }))
+  );
+
+  return {
+    seasonName: season.name,
+    currentPbOz,
+    nextDivisionName: nextDivision?.name ?? null,
+    divisions,
+  };
 }

@@ -89,9 +89,9 @@ export default function LeagueScreen() {
               Three divisions, seeded by personal best at the start of {overview.seasonName} and
               locked for its duration.
             </Text>
-            {overview.yourDeclaredPbOz !== null && (
+            {overview.currentPbOz !== null && (
               <Text style={[Typography.bodySmall, { color: theme.label }]}>
-                Your declared PB: {formatWeightOz(overview.yourDeclaredPbOz)}
+                Your current PB: {formatWeightOz(overview.currentPbOz)}
               </Text>
             )}
 
@@ -102,8 +102,9 @@ export default function LeagueScreen() {
             <View style={[styles.reseedCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <Text style={[Typography.label, { color: theme.label }]}>Reseeding</Text>
               <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>
-                Divisions are reseeded at the start of each season based on your latest declared
-                personal best.
+                {overview.currentPbOz !== null && overview.nextDivisionName
+                  ? `Your current PB is ${formatWeightOz(overview.currentPbOz)} — this will put you in ${overview.nextDivisionName} next season!`
+                  : 'Divisions are reseeded at the start of each season based on your current personal best — it updates automatically the moment a verified catch beats it.'}
               </Text>
             </View>
           </ScrollView>
