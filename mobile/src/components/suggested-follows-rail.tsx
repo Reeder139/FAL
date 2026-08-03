@@ -56,6 +56,7 @@ function Card({ card, onDismiss }: { card: SuggestedFollowCard; onDismiss: (id: 
 }
 
 export function SuggestedFollowsRail() {
+  const theme = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const [cards, setCards] = useState<SuggestedFollowCard[] | null>(null);
 
@@ -81,6 +82,7 @@ export function SuggestedFollowsRail() {
 
   return (
     <View style={styles.wrapper}>
+      <Text style={[Typography.label, styles.title, { color: theme.label }]}>Suggested accounts</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -101,8 +103,12 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
-    paddingTop: Spacing.two,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.three,
     paddingHorizontal: Spacing.three,
+  },
+  title: {
+    marginBottom: Spacing.two,
   },
   scrollContent: {
     gap: Spacing.two,
