@@ -28,6 +28,13 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="leaders">
+        <NativeTabs.Trigger.Label>Leaders</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          src={<NativeTabs.Trigger.VectorIcon family={Ionicons} name="medal-outline" />}
+        />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="activity">
         <NativeTabs.Trigger.Label>Activity</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
