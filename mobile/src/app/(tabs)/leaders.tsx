@@ -1,9 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { LeagueStripBar } from '@/components/league-strip-bar';
+import { TabScreen } from '@/components/tab-screen';
 import { BottomTabInset, MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -125,53 +124,43 @@ export default function LeadersScreen() {
   }, []);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <SafeAreaView style={styles.safeArea}>
-        <LeagueStripBar />
+    <TabScreen>
+      {loading ? (
+        <ActivityIndicator color={theme.primary} style={styles.loading} />
+      ) : !overview ? (
+        <View style={styles.emptyState}>
+          <Text style={[Typography.h1, { color: theme.text }]}>Division Leaders</Text>
+          <Text style={[Typography.h2, { color: theme.text, textAlign: 'center' }]}>
+            No season is open right now
+          </Text>
+          <Text style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>
+            Leaders will show up here once the next season starts.
+          </Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.content}>
+          <Text style={[Typography.h1, { color: theme.text }]}>Division Leaders</Text>
+          <Text style={[Typography.body, { color: theme.textSecondary }]}>
+            The top angler in each division of {overview.seasonName}.
+          </Text>
 
-        {loading ? (
-          <ActivityIndicator color={theme.primary} style={styles.loading} />
-        ) : !overview ? (
-          <View style={styles.emptyState}>
-            <Text style={[Typography.h1, { color: theme.text }]}>Division Leaders</Text>
-            <Text style={[Typography.h2, { color: theme.text, textAlign: 'center' }]}>
-              No season is open right now
-            </Text>
-            <Text style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>
-              Leaders will show up here once the next season starts.
+          {overview.divisions.map((division, index) => (
+            <LeaderCard key={division.id} division={division} index={index} />
+          ))}
+
+          <View style={[styles.infoCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <Text style={[Typography.label, { color: theme.label }]}>How division leaders are determined</Text>
+            <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>
+              Ranked by total points from each angler's counting fish this season.
             </Text>
           </View>
-        ) : (
-          <ScrollView contentContainerStyle={styles.content}>
-            <Text style={[Typography.h1, { color: theme.text }]}>Division Leaders</Text>
-            <Text style={[Typography.body, { color: theme.textSecondary }]}>
-              The top angler in each division of {overview.seasonName}.
-            </Text>
-
-            {overview.divisions.map((division, index) => (
-              <LeaderCard key={division.id} division={division} index={index} />
-            ))}
-
-            <View style={[styles.infoCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Text style={[Typography.label, { color: theme.label }]}>How division leaders are determined</Text>
-              <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>
-                Ranked by total points from each angler's counting fish this season.
-              </Text>
-            </View>
-          </ScrollView>
-        )}
-      </SafeAreaView>
-    </View>
+        </ScrollView>
+      )}
+    </TabScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
   loading: {
     flex: 1,
   },

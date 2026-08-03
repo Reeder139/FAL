@@ -2,8 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { TabScreen } from '@/components/tab-screen';
 import { BottomTabInset, MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -90,80 +90,70 @@ export default function DivisionStandingsScreen() {
   const accent = standings ? theme[DIVISION_COLOR_KEYS[(standings.rank - 1) % 3]] : theme.primary;
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <Pressable onPress={() => router.back()} style={[styles.backButton, { backgroundColor: theme.surface }]}>
-              <Ionicons name="arrow-back" size={20} color={theme.text} />
-            </Pressable>
-            <View style={styles.headerTitleGroup}>
-              <Text style={[Typography.h2, { color: theme.text }]} numberOfLines={1}>
-                {standings ? standings.divisionName : 'Division'}
-              </Text>
-              {standings && (
-                <Text style={[Typography.bodySmall, { color: accent }]}>{standings.seasonName}</Text>
-              )}
-            </View>
+    <TabScreen>
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={[styles.backButton, { backgroundColor: theme.surface }]}>
+            <Ionicons name="arrow-back" size={20} color={theme.text} />
+          </Pressable>
+          <View style={styles.headerTitleGroup}>
+            <Text style={[Typography.h2, { color: theme.text }]} numberOfLines={1}>
+              {standings ? standings.divisionName : 'Division'}
+            </Text>
+            {standings && <Text style={[Typography.bodySmall, { color: accent }]}>{standings.seasonName}</Text>}
           </View>
-
-          {loading ? (
-            <ActivityIndicator color={theme.primary} style={styles.loading} />
-          ) : !standings ? (
-            <View style={styles.emptyState}>
-              <Text style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>
-                Couldn't find that division.
-              </Text>
-            </View>
-          ) : (
-            <>
-              <View style={[styles.infoStrip, { backgroundColor: theme.surface, borderColor: accent }]}>
-                <View style={styles.infoStat}>
-                  <Text style={[Typography.label, { color: theme.label }]}>Range</Text>
-                  <Text style={[Typography.body, { color: theme.text }]}>
-                    {formatPbRange(standings.minPbOz, standings.maxPbOz)}
-                  </Text>
-                </View>
-                <View style={styles.infoStat}>
-                  <Text style={[Typography.label, { color: theme.label }]}>Anglers</Text>
-                  <Text style={[Typography.body, { color: theme.text }]}>{standings.memberCount}</Text>
-                </View>
-                <View style={styles.infoStat}>
-                  <Text style={[Typography.label, { color: theme.label }]}>Top score</Text>
-                  <Text style={[Typography.body, { color: theme.text }]}>
-                    {standings.rows[0] ? `${standings.rows[0].points.toFixed(1)} pts` : '—'}
-                  </Text>
-                </View>
-              </View>
-
-              {standings.rows.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Text style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>
-                    No qualifying catches in this division yet.
-                  </Text>
-                </View>
-              ) : (
-                <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-                  {standings.rows.map((row) => (
-                    <StandingRowItem key={row.anglerId} row={row} accent={accent} />
-                  ))}
-                </ScrollView>
-              )}
-            </>
-          )}
         </View>
-      </SafeAreaView>
-    </View>
+
+        {loading ? (
+          <ActivityIndicator color={theme.primary} style={styles.loading} />
+        ) : !standings ? (
+          <View style={styles.emptyState}>
+            <Text style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>
+              Couldn't find that division.
+            </Text>
+          </View>
+        ) : (
+          <>
+            <View style={[styles.infoStrip, { backgroundColor: theme.surface, borderColor: accent }]}>
+              <View style={styles.infoStat}>
+                <Text style={[Typography.label, { color: theme.label }]}>Range</Text>
+                <Text style={[Typography.body, { color: theme.text }]}>
+                  {formatPbRange(standings.minPbOz, standings.maxPbOz)}
+                </Text>
+              </View>
+              <View style={styles.infoStat}>
+                <Text style={[Typography.label, { color: theme.label }]}>Anglers</Text>
+                <Text style={[Typography.body, { color: theme.text }]}>{standings.memberCount}</Text>
+              </View>
+              <View style={styles.infoStat}>
+                <Text style={[Typography.label, { color: theme.label }]}>Top score</Text>
+                <Text style={[Typography.body, { color: theme.text }]}>
+                  {standings.rows[0] ? `${standings.rows[0].points.toFixed(1)} pts` : '—'}
+                </Text>
+              </View>
+            </View>
+
+            {standings.rows.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>
+                  No qualifying catches in this division yet.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+                {standings.rows.map((row) => (
+                  <StandingRowItem key={row.anglerId} row={row} accent={accent} />
+                ))}
+              </ScrollView>
+            )}
+          </>
+        )}
+      </View>
+    </TabScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
   content: {
     flex: 1,
     width: '100%',
@@ -175,7 +165,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingVertical: Spacing.one,
   },
   backButton: {
     width: 36,
@@ -202,9 +192,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderWidth: 1,
     borderRadius: Radii.md,
-    paddingVertical: Spacing.two,
+    paddingVertical: Spacing.one,
     paddingHorizontal: Spacing.three,
-    marginBottom: Spacing.two,
+    marginBottom: Spacing.one,
   },
   infoStat: {
     gap: Spacing.half,
@@ -217,7 +207,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    paddingVertical: Spacing.two,
+    paddingVertical: Spacing.one,
     paddingHorizontal: Spacing.two,
     borderWidth: 1,
     borderRadius: Radii.sm,

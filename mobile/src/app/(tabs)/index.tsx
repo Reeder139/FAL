@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, FlatList, StyleSheet } from 'react-native';
 
-import { LeagueStripBar } from '@/components/league-strip-bar';
 import { PostCard } from '@/components/post-card';
+import { TabScreen } from '@/components/tab-screen';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { getFeedItems, type FeedItemWithPhoto } from '@/lib/mockFeed';
@@ -27,38 +26,23 @@ export default function HomeScreen() {
   }, []);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <SafeAreaView style={styles.safeArea}>
-        {/* Pinned above the list — stays visible while scrolling rather than
-         * collapsing on scroll direction, which felt like the less
-         * intrusive of the two options: a static strip doesn't compete for
-         * attention with its own motion. */}
-        <LeagueStripBar />
-
-        {loading ? (
-          <ActivityIndicator color={theme.primary} />
-        ) : (
-          <FlatList
-            data={items}
-            keyExtractor={(item) => item.post_id}
-            renderItem={({ item }) => <PostCard item={item} />}
-            style={styles.list}
-            contentContainerStyle={styles.listContent}
-          />
-        )}
-      </SafeAreaView>
-    </View>
+    <TabScreen centered>
+      {loading ? (
+        <ActivityIndicator color={theme.primary} />
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.post_id}
+          renderItem={({ item }) => <PostCard item={item} />}
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+        />
+      )}
+    </TabScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-    alignItems: 'center',
-  },
   list: {
     width: '100%',
   },
