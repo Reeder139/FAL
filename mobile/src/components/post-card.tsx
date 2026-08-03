@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Radii, Shadows, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import type { FeedItemWithPhoto } from '@/lib/mockFeed';
+import type { FeedItemWithPhoto } from '@/lib/feed';
 import { formatWeightOz } from '@/lib/units';
 
 type PostCardProps = {
