@@ -5,7 +5,7 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { BottomTabInset, Radii, Shadows, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-const FAB_SIZE = Spacing.six;
+export const FAB_SIZE = Spacing.six;
 /** How far the FAB's bottom sits above the screen edge — tuned per
  * platform since the native tab bar's real height isn't something this
  * app controls directly (OS-rendered), unlike the custom web tab bar. */
