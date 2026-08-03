@@ -1,25 +1,113 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BottomTabInset, Spacing, Typography } from '@/constants/theme';
+import { BottomTabInset, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { fetchLeagueOverview, formatPbRange, type DivisionOverview, type LeagueOverview } from '@/lib/divisions';
+import { formatWeightOz } from '@/lib/units';
+
+const DIVISION_COLOR_KEYS = ['divisionOne', 'divisionTwo', 'divisionThree'] as const;
+
+function DivisionCard({ division, index }: { division: DivisionOverview; index: number }) {
+  const theme = useTheme();
+  const accent = theme[DIVISION_COLOR_KEYS[index % DIVISION_COLOR_KEYS.length]];
+
+  return (
+    <View style={[styles.card, { backgroundColor: theme.surface, borderColor: accent }]}>
+      <View style={styles.cardHeader}>
+        <View style={[styles.rankBadge, { backgroundColor: accent }]}>
+          <Text style={[Typography.h2, { color: theme.onPrimary }]}>{division.rank}</Text>
+        </View>
+        <View style={styles.cardTitleGroup}>
+          <Text style={[Typography.h2, { color: theme.text }]}>{division.name}</Text>
+          <Text style={[Typography.body, { color: accent }]}>
+            {formatPbRange(division.minPbOz, division.maxPbOz)}
+          </Text>
+        </View>
+        {division.isYourDivision && (
+          <View style={[styles.yourDivisionBadge, { backgroundColor: accent }]}>
+            <Text style={[Typography.caption, { color: theme.onPrimary }]}>Your division</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.statsRow}>
+        <View style={styles.stat}>
+          <Text style={[Typography.label, { color: theme.label }]}>Anglers</Text>
+          <Text style={[Typography.statValue, { color: theme.text }]}>{division.memberCount}</Text>
+        </View>
+        <View style={styles.stat}>
+          <Text style={[Typography.label, { color: theme.label }]}>Top score</Text>
+          <Text style={[Typography.statValue, { color: theme.text }]}>
+            {division.topScore !== null ? division.topScore.toFixed(1) : '—'}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 export default function LeagueScreen() {
   const theme = useTheme();
+  const [overview, setOverview] = useState<LeagueOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchLeagueOverview()
+      .then((data) => {
+        if (!cancelled) setOverview(data);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <SafeAreaView style={styles.safeArea}>
-        <Text style={[Typography.h1, { color: theme.text }]}>League</Text>
-        <View style={styles.emptyState}>
-          <Text style={[Typography.h2, { color: theme.text, textAlign: 'center' }]}>
-            Full standings are coming soon
-          </Text>
-          <Text style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>
-            Division tables, the big fish leaderboard, and the grand final tracker will all live
-            here.
-          </Text>
-        </View>
+        {loading ? (
+          <ActivityIndicator color={theme.primary} style={styles.loading} />
+        ) : !overview ? (
+          <View style={styles.emptyState}>
+            <Text style={[Typography.h1, { color: theme.text }]}>Divisions</Text>
+            <Text style={[Typography.h2, { color: theme.text, textAlign: 'center' }]}>
+              No season is open right now
+            </Text>
+            <Text style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>
+              Divisions will show up here once the next season starts.
+            </Text>
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.content}>
+            <Text style={[Typography.h1, { color: theme.text }]}>Divisions</Text>
+            <Text style={[Typography.body, { color: theme.textSecondary }]}>
+              Three divisions, seeded by personal best at the start of {overview.seasonName} and
+              locked for its duration.
+            </Text>
+            {overview.yourDeclaredPbOz !== null && (
+              <Text style={[Typography.bodySmall, { color: theme.label }]}>
+                Your declared PB: {formatWeightOz(overview.yourDeclaredPbOz)}
+              </Text>
+            )}
+
+            {overview.divisions.map((division, index) => (
+              <DivisionCard key={division.id} division={division} index={index} />
+            ))}
+
+            <View style={[styles.reseedCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <Text style={[Typography.label, { color: theme.label }]}>Reseeding</Text>
+              <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>
+                Divisions are reseeded at the start of each season based on your latest declared
+                personal best.
+              </Text>
+            </View>
+          </ScrollView>
+        )}
       </SafeAreaView>
     </View>
   );
@@ -31,9 +119,9 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    padding: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.four,
-    gap: Spacing.six,
+  },
+  loading: {
+    flex: 1,
   },
   emptyState: {
     flex: 1,
@@ -41,5 +129,51 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.two,
     paddingHorizontal: Spacing.four,
+  },
+  content: {
+    padding: Spacing.four,
+    paddingBottom: BottomTabInset + Spacing.four,
+    gap: Spacing.three,
+  },
+  card: {
+    borderRadius: Radii.lg,
+    borderWidth: 1,
+    padding: Spacing.four,
+    gap: Spacing.three,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  rankBadge: {
+    width: Spacing.six,
+    height: Spacing.six,
+    borderRadius: Radii.circle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTitleGroup: {
+    flex: 1,
+    gap: Spacing.half,
+  },
+  yourDivisionBadge: {
+    borderRadius: Radii.pill,
+    paddingVertical: Spacing.half,
+    paddingHorizontal: Spacing.two,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: Spacing.five,
+  },
+  stat: {
+    gap: Spacing.half,
+  },
+  reseedCard: {
+    borderRadius: Radii.md,
+    borderWidth: 1,
+    padding: Spacing.three,
+    gap: Spacing.one,
+    marginTop: Spacing.two,
   },
 });

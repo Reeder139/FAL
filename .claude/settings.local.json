@@ -46,7 +46,8 @@
       "Bash(node -e \"const d=JSON.parse\\(require\\('fs'\\).readFileSync\\(0\\)\\); console.log\\(d.access_token ? 'got token' : JSON.stringify\\(d\\)\\); console.log\\(d.user && d.user.id\\)\")",
       "Bash(node -e ' *)",
       "Bash(taskkill //F //PID 32076)",
-      "Bash(taskkill //F //PID 9420)"
+      "Bash(taskkill //F //PID 9420)",
+      "Bash(taskkill //F //PID 32772)"
     ]
   }
 }
