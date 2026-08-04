@@ -1,0 +1,102 @@
+{
+  "source": "a_clean_high_detail_ui_branding_concept_art_sheet.png",
+  "source_dimensions": [
+    1024,
+    1536
+  ],
+  "assets": {
+    "01_fantasy_fishing_logo.png": {
+      "dimensions": [
+        2048,
+        2048
+      ],
+      "transparent_background": true,
+      "source_crop": [
+        18,
+        70,
+        475,
+        495
+      ]
+    },
+    "02_prize_box.png": {
+      "dimensions": [
+        2400,
+        1400
+      ],
+      "transparent_background": true,
+      "source_crop": [
+        474,
+        96,
+        1013,
+        485
+      ]
+    },
+    "03_login_button.png": {
+      "dimensions": [
+        2400,
+        600
+      ],
+      "transparent_background": true,
+      "source_crop": [
+        539,
+        592,
+        1012,
+        696
+      ]
+    },
+    "04_register_button.png": {
+      "dimensions": [
+        2400,
+        600
+      ],
+      "transparent_background": true,
+      "source_crop": [
+        539,
+        718,
+        1012,
+        820
+      ]
+    },
+    "05_bottom_rail.png": {
+      "dimensions": [
+        2400,
+        900
+      ],
+      "transparent_background": true,
+      "source_crop": [
+        539,
+        1150,
+        1013,
+        1362
+      ]
+    },
+    "06_full_background_scene_2160x3840.png": {
+      "dimensions": [
+        2160,
+        3840
+      ],
+      "transparent_background": false,
+      "source_crop": [
+        17,
+        551,
+        524,
+        1462
+      ],
+      "note": "Extra-large 9:16 portrait background for app development."
+    },
+    "07_prize_trophy_emblem.png": {
+      "dimensions": [
+        1400,
+        1400
+      ],
+      "transparent_background": true,
+      "source_crop": [
+        487,
+        112,
+        642,
+        360
+      ],
+      "note": "Seventh supporting asset added because seven separate files were requested."
+    }
+  }
+}
