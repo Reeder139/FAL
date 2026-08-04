@@ -14,8 +14,11 @@ import type { LeagueSummary } from '@/lib/leagueSummary';
 import { ordinal } from '@/lib/units';
 
 /** Source dimensions of the prepared banner (see
- * scripts/prepare-join-banner.mjs). */
-const JOIN_BANNER_RATIO = 700 / 189;
+ * scripts/prepare-join-banner.mjs). Must match the asset exactly: the box is
+ * drawn at this ratio, so if the artwork is any shorter than the ratio says,
+ * the difference shows up as dead space inside the box that centring the box
+ * can't remove. */
+const JOIN_BANNER_RATIO = 700 / 151;
 
 // TODO: real trend delta once we have standings history to diff against —
 // hardcoded placeholder for now, per the design ask.

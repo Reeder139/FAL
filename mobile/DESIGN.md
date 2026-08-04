@@ -268,16 +268,26 @@ resulting height to `LeagueStripBannerHeight`. Measured result:
 
 | Viewport | Strip | Banner | Space above/below |
 |---|---|---|---|
-| 360 | 44 | 104×28 | 8 |
-| 390 | 45 | 133×36 | 5 |
-| ≥478 | 69 | 222×60 | 5 |
+| 390 | 43 | 134×29 | 7 |
+| ≥534 | 69 | 278×60 | 4.6 |
 
 The banner is always vertically centred in the strip, and the strip hugs it:
 past the point where the text column stops being the tallest thing in the row,
 strip height is just the banner plus the container's padding. So "fill the
 strip better" means a bigger banner and a deeper strip together — they can't
-move independently. The `max` is the lever, and it only bites above ~478px
-wide; phones sit below it and are sized by the width left over instead.
+move independently. The `max` is the lever, and it only bites above ~534px
+wide; phones sit below it and are sized by the width left over instead, which
+is why the banner doesn't reach full height there.
+
+**`JOIN_BANNER_RATIO` must match the shipped asset exactly.** The box is drawn
+at that ratio and the image is `contain`-fitted into it, so if the artwork is
+shorter than the ratio claims, the shortfall becomes dead space *inside* the
+box — and centring the box in the strip cannot fix it, because the box is
+already centred. This bit once: the banner was cropped by which pixels the
+backdrop flood-fill had touched rather than by alpha, so pre-existing
+transparency in the source was counted as content and 56px of empty padding
+was baked into the bottom of the asset. The artwork sat top-aligned in its own
+frame and looked uncentred no matter what the layout did.
 
 **Don't size this from the strip's own height** (`alignSelf: 'stretch'` plus
 `aspectRatio`), which looks like the obvious way to make it fill. That's a

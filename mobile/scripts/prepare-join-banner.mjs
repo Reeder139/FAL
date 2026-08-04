@@ -35,6 +35,8 @@ const OUT = path.join(OUT_DIR, 'join-league-banner.png');
  * vignette across v2's gold field — which drifts by ~20 per channel corner
  * to centre — without reaching the near-black banner body. */
 const KEY_TOLERANCE = 72;
+/** Alpha at or below this counts as empty when working out the crop box. */
+const ALPHA_FLOOR = 16;
 /** Bundled width. The strip renders it around 170px wide, so this is ~4x
  * for high-density screens without carrying the full source resolution. */
 const TARGET_WIDTH = 700;
@@ -83,23 +85,31 @@ async function main() {
     stack.push(x + 1, y, x - 1, y, x, y + 1, x, y - 1);
   }
 
+  for (let p = 0; p < w * h; p++) {
+    if (cleared[p]) data[p * channels + 3] = 0;
+  }
+
+  // Crop box comes from the alpha channel, not from the `cleared` flag.
+  // Those aren't the same set: the source arrives with transparent regions of
+  // its own whose RGB isn't near the sampled backdrop, so the flood fill
+  // leaves them alone and a `cleared`-based box counts them as content. That
+  // baked 56px of transparent padding into the bottom of the shipped banner
+  // and none into the top — so the artwork sat top-aligned inside its own
+  // frame, and no amount of centring the frame in the strip could fix it.
   let minX = w;
   let minY = h;
-  let maxX = 0;
-  let maxY = 0;
+  let maxX = -1;
+  let maxY = -1;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const p = y * w + x;
-      if (cleared[p]) {
-        data[p * channels + 3] = 0;
-      } else {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
+      if (data[(y * w + x) * channels + 3] <= ALPHA_FLOOR) continue;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
     }
   }
+  if (maxX < 0) throw new Error(`${SRC}: nothing left above alpha ${ALPHA_FLOOR} after keying`);
 
   const cropW = maxX - minX + 1;
   const cropH = maxY - minY + 1;
