@@ -5,6 +5,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import AppTabs from '@/components/app-tabs';
 import { CatchFab } from '@/components/catch-fab';
 import { ConvertPrompt } from '@/components/convert-prompt';
+import { PhotoLightboxHost, PhotoLightboxProvider } from '@/components/photo-lightbox';
 import { RulesPromptHost, RulesPromptProvider } from '@/components/rules-prompt';
 import { useTheme } from '@/hooks/use-theme';
 import { useLeagueSummary } from '@/lib/leagueSummary';
@@ -67,6 +68,7 @@ export default function TabsLayout() {
 
   return (
     <RulesPromptProvider>
+      <PhotoLightboxProvider>
       <View style={styles.container}>
         <AppTabs />
         {/* Catch isn't a real tab route — it's a raised button that opens
@@ -77,7 +79,9 @@ export default function TabsLayout() {
         {/* Last, so it covers the tab bar and Catch button. Opened from the
           * feed's header row via useRulesPrompt(). */}
         <RulesPromptHost />
+        <PhotoLightboxHost />
       </View>
+      </PhotoLightboxProvider>
     </RulesPromptProvider>
   );
 }

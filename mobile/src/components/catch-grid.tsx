@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { usePhotoLightbox } from '@/components/photo-lightbox';
 import { fetchAnglerCatches, type AnglerCatch } from '@/lib/catches';
 import { formatWeightOz } from '@/lib/units';
 
@@ -14,10 +15,22 @@ const HALF_GUTTER = Spacing.half;
 
 function CatchTile({ item }: { item: AnglerCatch }) {
   const theme = useTheme();
+  const { showPhoto } = usePhotoLightbox();
+
+  // Only catches that actually have a photo open — seeded and pre-in-app
+  // catches show a fish outline, and tapping through to nothing would read
+  // as broken.
+  const openable = item.photoUrl !== null;
+  const caption = [formatWeightOz(item.weightOz), item.venueName].filter(Boolean).join(' · ');
 
   return (
     <View style={styles.cell}>
-      <View style={[styles.tile, { backgroundColor: theme.surfaceElevated }]}>
+      <Pressable
+        disabled={!openable}
+        onPress={() => item.photoUrl && showPhoto({ uri: item.photoUrl, caption })}
+        accessibilityRole={openable ? 'button' : undefined}
+        accessibilityLabel={openable ? `View ${caption} full size` : undefined}
+        style={({ pressed }) => [styles.tile, { backgroundColor: theme.surfaceElevated }, pressed && styles.tilePressed]}>
         {item.photoUrl ? (
           <Image source={{ uri: item.photoUrl }} style={styles.photo} resizeMode="cover" />
         ) : (
@@ -39,7 +52,7 @@ function CatchTile({ item }: { item: AnglerCatch }) {
             </Text>
           )}
         </View>
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -112,6 +125,9 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: Radii.sm,
     overflow: 'hidden',
+  },
+  tilePressed: {
+    opacity: 0.7,
   },
   photo: {
     width: '100%',

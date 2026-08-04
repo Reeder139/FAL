@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider } from '@/providers/auth-provider';
@@ -8,6 +8,11 @@ import { AuthProvider } from '@/providers/auth-provider';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  // Via @/hooks/use-color-scheme, not react-native's hook directly: the web
+  // variant re-resolves after hydration, which static rendering needs. With
+  // the raw hook this provider stayed on DefaultTheme, leaving
+  // react-navigation's #f2f2f2 backdrop behind every screen even in dark mode
+  // — hidden while a screen covers it, visible the moment one doesn't.
   const colorScheme = useColorScheme();
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

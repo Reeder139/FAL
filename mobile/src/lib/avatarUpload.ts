@@ -50,7 +50,12 @@ export async function pickAndUploadAvatar(): Promise<string | null> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Must be signed in to upload an avatar.');
 
-  const path = `${user.id}/avatar.jpg`;
+  // Timestamped rather than a fixed `avatar.jpg`. The bucket is public and
+  // served through a CDN, so overwriting one path in place meant a new
+  // upload kept showing the old picture until the cache expired. A fresh
+  // path is a fresh URL, so the change is visible immediately. It does leave
+  // the previous file behind — worth a cleanup pass if avatars ever churn.
+  const path = `${user.id}/avatar-${Date.now()}.jpg`;
   const { error } = await supabase.storage
     .from(AVATARS_BUCKET)
     .upload(path, bytes, { contentType: 'image/jpeg', upsert: true });

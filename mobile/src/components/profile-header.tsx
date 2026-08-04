@@ -1,6 +1,7 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FollowButton } from '@/components/follow-button';
 import { Radii, Spacing, Typography } from '@/constants/theme';
@@ -18,6 +19,12 @@ type ProfileHeaderProps = {
   followingCount: number;
   isSelf: boolean;
   isFollowing: boolean;
+  /** Supplied only for your own profile — makes the avatar a button that
+   * opens the picker. Omitted elsewhere, so another angler's picture is
+   * never tappable. */
+  onChangeAvatar?: () => void;
+  /** Shows the avatar mid-upload so a slow pick doesn't look like a no-op. */
+  changingAvatar?: boolean;
 };
 
 /** Shared by the self profile screen and the view-another-angler screen —
@@ -34,6 +41,8 @@ export function ProfileHeader({
   followingCount,
   isSelf,
   isFollowing,
+  onChangeAvatar,
+  changingAvatar = false,
 }: ProfileHeaderProps) {
   const theme = useTheme();
   const router = useRouter();
@@ -48,7 +57,31 @@ export function ProfileHeader({
 
   return (
     <View style={styles.container}>
-      {avatarUrl ? (
+      {onChangeAvatar ? (
+        <Pressable
+          onPress={onChangeAvatar}
+          disabled={changingAvatar}
+          accessibilityRole="button"
+          accessibilityLabel={avatarUrl ? 'Change your profile picture' : 'Add a profile picture'}
+          style={({ pressed }) => [styles.avatarButton, pressed && styles.avatarPressed]}>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: theme.surfaceElevated }]} />
+          )}
+          {/* A camera badge on the rim rather than a caption underneath: it
+           * says the picture is editable without adding a row of chrome to a
+           * header that's already dense. */}
+          <View
+            style={[styles.avatarBadge, { backgroundColor: theme.primary, borderColor: theme.background }]}>
+            {changingAvatar ? (
+              <ActivityIndicator size="small" color={theme.onPrimary} />
+            ) : (
+              <Ionicons name="camera" size={14} color={theme.onPrimary} />
+            )}
+          </View>
+        </Pressable>
+      ) : avatarUrl ? (
         <Image source={{ uri: avatarUrl }} style={styles.avatar} />
       ) : (
         <View style={[styles.avatar, { backgroundColor: theme.surfaceElevated }]} />
@@ -102,6 +135,26 @@ const styles = StyleSheet.create({
     height: Spacing.six,
     borderRadius: Radii.circle,
     marginBottom: Spacing.three,
+  },
+  /** Wraps the avatar so the badge can be positioned against it. The bottom
+   * margin lives on the avatar itself, so the badge sits above it rather
+   * than in the gap. */
+  avatarButton: {
+    alignItems: 'center',
+  },
+  avatarPressed: {
+    opacity: 0.7,
+  },
+  avatarBadge: {
+    position: 'absolute',
+    right: 0,
+    bottom: Spacing.three,
+    width: Spacing.four,
+    height: Spacing.four,
+    borderRadius: Radii.circle,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   countsRow: {
     flexDirection: 'row',
