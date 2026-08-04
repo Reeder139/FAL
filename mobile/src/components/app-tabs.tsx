@@ -33,10 +33,10 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      {/* League is the way in to the national table, the divisions and the
-       * leaders board — those three were tabs of their own and are now
-       * options on the league page. */}
-      <NativeTabs.Trigger name="divisions">
+      {/* Lands on the National League table — every angler in the season,
+       * paid or free, in one standing. Divisions and the leaders board were
+       * tabs of their own and are now links from that page. */}
+      <NativeTabs.Trigger name="league">
         <NativeTabs.Trigger.Label hidden>League</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/nav/national-league.png')}

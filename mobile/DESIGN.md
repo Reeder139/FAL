@@ -218,9 +218,9 @@ button and container padding, so `NavIconSize` is the only number to change
 if the bar should be deeper or shallower.
 
 **Tab order** is Feed, League, [Catch], Activity, Profile — four tabs splitting
-2/2 around the raised button. League is the way in to the national table, the
-divisions and the leaders board, which were tabs of their own until they became
-options on the league page.
+2/2 around the raised button. League lands on the National League table (every
+angler in the season, paid or free, in one standing); the divisions overview and
+the leaders board were tabs of their own and are now slim links from that page.
 
 **What caps the icon size.** The bar splits into two equal halves either side of
 the Catch button, and that split has to stay even: the FAB is centred on the

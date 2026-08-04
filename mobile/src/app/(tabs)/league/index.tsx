@@ -1,11 +1,60 @@
+import { useRouter, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ImageSourcePropType,
+} from 'react-native';
 
 import { LeagueTable } from '@/components/league-table';
 import { TabScreen } from '@/components/tab-screen';
-import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
+import { MaxContentWidth, NavIconSize, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchNationalStandings, type NationalStandings } from '@/lib/divisions';
+
+/**
+ * Divisions and the leaders board used to be tabs of their own. The bottom
+ * bar now carries a single League tab landing here, so these two links are
+ * the only way into either — without them they'd be live routes with nothing
+ * pointing at them.
+ *
+ * Deliberately a slim pill rather than the taller card treatment: this page's
+ * table is the point, and every pixel spent above it is a row the angler
+ * can't see without scrolling.
+ */
+function LeagueLink({
+  href,
+  icon,
+  label,
+}: {
+  href: Href;
+  icon: ImageSourcePropType;
+  label: string;
+}) {
+  const theme = useTheme();
+  const router = useRouter();
+
+  return (
+    <Pressable
+      onPress={() => router.push(href)}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [
+        styles.link,
+        { backgroundColor: theme.surface, borderColor: theme.border },
+        pressed && styles.linkPressed,
+      ]}>
+      <Image source={icon} style={styles.linkIcon} resizeMode="contain" />
+      <Text style={[Typography.bodySmall, { color: theme.text, fontWeight: '700' }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
 
 export default function NationalLeagueScreen() {
   const theme = useTheme();
@@ -69,6 +118,19 @@ export default function NationalLeagueScreen() {
               </View>
             </View>
 
+            <View style={styles.linkRow}>
+              <LeagueLink
+                href="/league/divisions"
+                icon={require('@/assets/images/nav/divisions.png')}
+                label="Divisions"
+              />
+              <LeagueLink
+                href="/league/leaders"
+                icon={require('@/assets/images/nav/leaders.png')}
+                label="Leaders"
+              />
+            </View>
+
             <LeagueTable divisionId={null} showDivisionBadge />
           </>
         )}
@@ -110,5 +172,28 @@ const styles = StyleSheet.create({
   },
   infoStat: {
     gap: Spacing.half,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    marginBottom: Spacing.two,
+  },
+  link: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    borderWidth: 1,
+    borderRadius: Radii.pill,
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.three,
+  },
+  linkPressed: {
+    opacity: 0.7,
+  },
+  linkIcon: {
+    width: NavIconSize,
+    height: NavIconSize,
   },
 });

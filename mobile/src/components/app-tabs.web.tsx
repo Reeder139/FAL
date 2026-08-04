@@ -24,10 +24,10 @@ export default function AppTabs() {
           <TabTrigger name="home" href="/" asChild>
             <TabButton icon={require('@/assets/images/nav/feed.png')} label="Feed" />
           </TabTrigger>
-          {/* League is the way in to the national table, the divisions and
-            * the leaders board — those three used to be tabs of their own and
-            * are now options on the league page. */}
-          <TabTrigger name="divisions" href="/divisions" asChild>
+          {/* Lands on the National League table — every angler in the season,
+            * paid or free, in one standing. Divisions and the leaders board
+            * were tabs of their own and are now links from that page. */}
+          <TabTrigger name="league" href="/league" asChild>
             <TabButton icon={require('@/assets/images/nav/national-league.png')} label="League" />
           </TabTrigger>
           <TabTrigger name="activity" href="/activity" asChild>

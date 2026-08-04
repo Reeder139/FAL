@@ -84,7 +84,7 @@ export function LeagueStrip({ summary }: LeagueStripProps) {
       {/* The standings area and the join link go to different places, so
        * they're separate targets rather than one Pressable wrapping the
        * whole strip. They sit side by side, splitting the row. */}
-      <Pressable onPress={() => router.push('/divisions')} style={styles.textGroup}>
+      <Pressable onPress={() => router.push('/league')} style={styles.textGroup}>
         <Text style={[Typography.label, { color: theme.label }]}>Your Current League Position</Text>
         {/* Two lines rather than one: sharing the row with the join prompt
          * leaves too little width to fit the standings on a single line,
