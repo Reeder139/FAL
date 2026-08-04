@@ -5,7 +5,7 @@ import { Image, Pressable, View, StyleSheet, type ImageSourcePropType } from 're
 import { FAB_SIZE } from './catch-fab';
 import { ThemedView } from './themed-view';
 
-import { MaxContentWidth, NavIconSize, NavIconSizeWide, Spacing } from '@/constants/theme';
+import { MaxContentWidth, NavIconSize, NavIconWide, Spacing } from '@/constants/theme';
 
 // The raised Catch button floats centered over this bar (see catch-fab.tsx)
 // — it isn't one of the TabTriggers below. Reserve a gap the same width as
@@ -33,7 +33,7 @@ export default function AppTabs() {
           <TabTrigger name="activity" href="/activity" asChild>
             <TabButton
               icon={require('@/assets/images/nav/activity.png')}
-              iconSize={NavIconSizeWide}
+              iconBox={NavIconWide}
               label="Activity"
             />
           </TabTrigger>
@@ -51,12 +51,21 @@ type TabButtonProps = TabTriggerSlotProps & {
   /** The tab's name. Not drawn — the artwork is the label now — but carried
    * as the accessible name, since a screen reader can't read a picture. */
   label: string;
-  /** Override for artwork whose aspect is far from square, so it can be
-   * given a box that matches the others by area. Defaults to NavIconSize. */
-  iconSize?: number;
+  /** Override for artwork whose aspect is far from square, so it can be given
+   * a box matching the others by area. Must be the artwork's true dimensions,
+   * not a square containing it — the bar's row height comes from the tallest
+   * icon box, so slack here deepens the whole bar. Defaults to a NavIconSize
+   * square. */
+  iconBox?: { width: number; height: number };
 };
 
-export function TabButton({ icon, label, iconSize = NavIconSize, isFocused, ...props }: TabButtonProps) {
+export function TabButton({
+  icon,
+  label,
+  iconBox = { width: NavIconSize, height: NavIconSize },
+  isFocused,
+  ...props
+}: TabButtonProps) {
   return (
     <Pressable
       {...props}
@@ -77,7 +86,7 @@ export function TabButton({ icon, label, iconSize = NavIconSize, isFocused, ...p
          * icon recognisable. */}
         <Image
           source={icon}
-          style={[{ width: iconSize, height: iconSize }, !isFocused && styles.iconUnfocused]}
+          style={[iconBox, !isFocused && styles.iconUnfocused]}
           resizeMode="contain"
         />
       </ThemedView>
@@ -126,7 +135,11 @@ const styles = StyleSheet.create({
   innerContainer: {
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.one,
-    borderRadius: Spacing.five,
+    // Square ends, not a pill. The bar sits flush to the bottom of the
+    // screen, and a corner radius there curved the bottom two corners away
+    // from the screen edge — leaving the background showing through at each
+    // end of the edge it's supposed to be sitting on.
+    borderRadius: 0,
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',

@@ -178,8 +178,8 @@ Don't invent new division colors per screen — always pull `divisionOne` /
 | `LeagueStripBannerHeight` | `{ min: 28, max: 48 }` | Join banner in the League Position strip, clamped — see below |
 | `LeagueStripTextMinWidth` | 208 | Width the strip reserves for its text column before sizing the banner |
 | `SearchIconSize` | 28 | Member-search icon on the feed, right-aligned on the tab pills' row |
-| `NavIconSize` | 36 | Bottom nav bar icons — bounded by tab width (~62px at 360), not height |
-| `NavIconSizeWide` | 46 | Box for the activity icon, whose art is 1.63:1 — area-matched to the rest |
+| `NavIconSize` | 42 | Bottom nav bar icons — bounded by tab width (~62px at 360), not height |
+| `NavIconWide` | 54×33 | Box for the activity icon, whose art is 1.63:1 — area-matched to the rest |
 
 ### Bottom nav bar
 
@@ -205,17 +205,21 @@ and full opacity against 0.65 for the rest. The icons are full-colour gold,
 so a "muted" color token would fight the artwork — opacity is what dims them
 without recolouring.
 
-The bar sits flush to the bottom of the screen — no padding underneath it —
-while keeping its horizontal inset, so it reads as a centred pill anchored to
-the bottom edge rather than a floating one. The Catch FAB's `bottom` offset
-tracks this: it's set so the FAB overhangs the bar's top edge by 12px, and
-moving the bar without moving the FAB leaves it floating free of the bar.
+The bar sits flush to the bottom of the screen with square ends — no padding
+underneath and no corner radius, since a radius there curved the bottom two
+corners away from the screen edge and showed the background through at each
+end. It keeps its horizontal inset, so it's a centred block anchored to the
+bottom rather than a full-bleed one.
 
-Bar depth is 68px of visible bar inside an 84px footprint (the outer
+The Catch FAB's `bottom` offset tracks the bar's depth: it's set so the FAB
+overhangs the bar's top edge by ~14px. Anything that changes the bar's height
+moves that relationship, so the FAB has to move with it or it ends up sunk
+into the bar (or floating free of it).
+
+Bar depth is 74px of visible bar inside a 90px footprint (the outer
 `Spacing.three` padding is above it only), up from 50px of bar when it held
-two-line text labels. Depth is derived, not chosen: it's the icon plus the
-button and container padding, so `NavIconSize` is the only number to change
-if the bar should be deeper or shallower.
+two-line text labels. Depth is derived, not chosen: it's the tallest icon box
+plus the button and container padding.
 
 **Tab order** is Feed, League, [Catch], Activity, Profile — four tabs splitting
 2/2 around the raised button. League lands on the National League table (every
@@ -235,10 +239,16 @@ backed out then. Adding a fifth tab back brings that constraint with it.
 
 **Mismatched aspects.** The activity artwork is 1.63:1 where the others are
 0.98–1.26, so squaring it leaves the art filling ~61% of the box height and
-reading as the small icon in the row. It gets `NavIconSizeWide` instead —
-`NavIconSize * sqrt(1.63)`, which matches the others by *area* (~46×28 against
-~36×36). Matching by height would need a 59px box and leave almost no gap to its
-neighbour at 360. Any future icon this far from square needs the same treatment.
+reading as the small icon in the row. It gets `NavIconWide` instead, whose width
+is `NavIconSize * sqrt(1.63)` — matching the others by *area* (54×33 against
+42×42). Matching by height would need a 68px box, wider than a whole tab at 360.
+
+Its asset is also left at its true aspect by the prep script rather than padded
+to a square, and `NavIconWide` carries an explicit height to suit. That isn't
+cosmetic: the bar's row height comes from the tallest icon box, so a square
+activity box padded the row with transparency nobody could see and made the
+whole bar 12px deeper. Any future icon this far from square needs both halves —
+an unsquared asset and a true-aspect box.
 
 ### The League Position strip's join banner
 

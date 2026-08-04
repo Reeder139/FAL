@@ -14,7 +14,7 @@ export const FAB_SIZE = Spacing.six;
  * screen, and this value is what leaves the FAB overhanging its top edge by
  * the same amount it always has. Move the bar and this has to move with it,
  * or the FAB floats free of it. */
-const FAB_BOTTOM = Platform.select({ web: Spacing.three, default: BottomTabInset });
+const FAB_BOTTOM = Platform.select({ web: Spacing.four, default: BottomTabInset });
 
 export function CatchFab() {
   const theme = useTheme();

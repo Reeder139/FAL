@@ -43,12 +43,16 @@ const OUT_DIR = path.resolve('assets', 'images', 'nav');
  * them: they moved to options on the league page, and the art is 3-7KB each.
  */
 const ICONS = [
-  ['01_feed_symbol.png', 'feed.png'],
-  ['02_national_league_symbol.png', 'national-league.png'],
-  ['03_divisions_symbol.png', 'divisions.png'],
-  ['04_leaders_symbol.png', 'leaders.png'],
-  ['05_profile_symbol.png', 'profile.png'],
-  ['activity.png', 'activity.png'],
+  ['01_feed_symbol.png', 'feed.png', { square: true }],
+  ['02_national_league_symbol.png', 'national-league.png', { square: true }],
+  ['03_divisions_symbol.png', 'divisions.png', { square: true }],
+  ['04_leaders_symbol.png', 'leaders.png', { square: true }],
+  ['05_profile_symbol.png', 'profile.png', { square: true }],
+  // Kept at its own 1.63:1 rather than squared. Padding it to a square puts
+  // transparent bands above and below the art, and the bar sizes its row
+  // from the tallest icon box — so a square activity icon made the whole bar
+  // 12px deeper to hold padding nobody can see.
+  ['activity.png', 'activity.png', { square: false }],
 ];
 
 /** Alpha at or below this counts as empty canvas. Low, so the crop keeps
@@ -60,7 +64,7 @@ const TARGET_SIZE = 128;
 
 const kb = (bytes) => `${(bytes / 1024).toFixed(0)}KB`;
 
-async function prepare(srcName, outName) {
+async function prepare(srcName, outName, { square }) {
   const src = path.join(SRC_DIR, srcName);
   const { data, info } = await sharp(src).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width: w, height: h, channels } = info;
@@ -86,26 +90,27 @@ async function prepare(srcName, outName) {
 
   await sharp(data, { raw: { width: w, height: h, channels } })
     .extract({ left: minX, top: minY, width: cropW, height: cropH })
-    .resize({
-      width: TARGET_SIZE,
-      height: TARGET_SIZE,
-      fit: 'contain',
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    })
+    .resize(
+      square
+        ? { width: TARGET_SIZE, height: TARGET_SIZE, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }
+        : { width: TARGET_SIZE }
+    )
     .png({ palette: true, quality: 90, effort: 10 })
     .toFile(out);
 
   const before = (await stat(src)).size;
   const after = (await stat(out)).size;
+  const outMeta = await sharp(out).metadata();
   console.log(
     `  ${srcName.padEnd(31)} ink ${String(cropW).padStart(3)}x${String(cropH).padStart(3)}` +
-      ` (ratio ${(cropW / cropH).toFixed(2)})  ->  ${outName.padEnd(20)} ${kb(before)} -> ${kb(after)}`
+      ` (ratio ${(cropW / cropH).toFixed(2)})  ->  ${outName.padEnd(20)}` +
+      ` ${outMeta.width}x${outMeta.height}  ${kb(before)} -> ${kb(after)}`
   );
 }
 
 async function main() {
   await mkdir(OUT_DIR, { recursive: true });
-  for (const [srcName, outName] of ICONS) await prepare(srcName, outName);
+  for (const [srcName, outName, opts] of ICONS) await prepare(srcName, outName, opts);
 }
 
 main().catch((err) => {

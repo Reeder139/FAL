@@ -421,13 +421,18 @@ export const SearchIconSize = 28;
  * right-hand tabs a third narrower at ~41px and is why this sits at 36; the
  * even split has since bought back ~20px per tab. The bar's depth follows
  * from this value, so raising it deepens the bar by the same amount. */
-export const NavIconSize = 36;
+export const NavIconSize = 42;
 /** Box for the activity icon specifically. Its artwork is 1.63:1 where every
- * other nav symbol is near-square, so squaring it leaves the art filling only
- * ~61% of the box height — in a row of icons it reads as the small one.
+ * other nav symbol is near-square, so it gets its own size rather than being
+ * squared off — squared, the art fills only ~61% of the box and reads as the
+ * small icon in the row.
  *
- * Sized to match the others by area rather than by height: `NavIconSize *
- * sqrt(1.63)` = 46, which puts ~46x28 of artwork on screen against their
- * ~36x36. Matching height instead would need a 59px box, which at four tabs
- * leaves almost no gap to its neighbour on a 360px phone. */
-export const NavIconSizeWide = 46;
+ * Width matches the others by area (`NavIconSize * sqrt(1.63)`), putting
+ * ~54x33 of artwork on screen against their 42x42. Matching by height
+ * instead would need a 68px box, wider than a whole tab on a 360px phone.
+ *
+ * Height is given explicitly, and must stay the artwork's true height at
+ * this width. A square box here would be transparent above and below the
+ * art — but the bar sizes its row from the tallest icon box, so that
+ * invisible padding would deepen the whole bar by 12px. */
+export const NavIconWide = { width: 54, height: 33 } as const;
