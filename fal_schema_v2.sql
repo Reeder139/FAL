@@ -1423,39 +1423,83 @@ begin
     return;
   end if;
 
-  -- Real rows. Division mode reads league_table (rank partitioned by
-  -- division); national mode reads national_league_table (partitioned by
-  -- season). Both already cap at the season's counting_fish.
-  return query
-  select
-    lt.angler_id,
-    p.username,
-    p.display_name,
-    p.avatar_path,
-    lt.division_id,
-    d.name,
-    d.rank,
-    lt.total_points,
-    lt.counting_fish::integer,
-    lt.best_fish_oz,
-    lt.position::integer,
-    false,
-    lt.angler_id = v_caller
-  from (
-    select l.angler_id, l.division_id, l.total_points, l.counting_fish, l.best_fish_oz, l.position
-    from league_table l
-    where p_division_id is not null
-      and l.season_id = v_season.id
-      and l.division_id = p_division_id
-    union all
-    select n.angler_id, n.division_id, n.total_points, n.counting_fish, n.best_fish_oz, n.position
+  -- Division mode. Paid rows are numbered against each other only; unpaid
+  -- rows come back with a null position and is_ghost true.
+  --
+  -- The number is "how many paying anglers are ahead of you, plus one",
+  -- counted directly rather than via rank(), because a window function would
+  -- have to rank over the unpaid rows too and then have them subtracted back
+  -- out. Ties share a number, which is what rank() did before.
+  if p_division_id is not null then
+    return query
+    with member_rows as (
+      select
+        l.angler_id,
+        l.division_id,
+        l.total_points,
+        l.counting_fish,
+        l.best_fish_oz,
+        exists (
+          select 1
+          from season_entries se
+          where se.angler_id = l.angler_id
+            and se.season_id = l.season_id
+            and se.tier = 'competitor'
+        ) as is_paid
+      from league_table l
+      where l.season_id = v_season.id
+        and l.division_id = p_division_id
+    )
+    select
+      m.angler_id,
+      p.username,
+      p.display_name,
+      p.avatar_path,
+      m.division_id,
+      d.name,
+      d.rank,
+      m.total_points,
+      m.counting_fish::integer,
+      m.best_fish_oz,
+      case
+        when m.is_paid then (
+          select count(*)::integer + 1
+          from member_rows ahead
+          where ahead.is_paid
+            and ahead.total_points > m.total_points
+        )
+        else null
+      end,
+      not m.is_paid,
+      m.angler_id = v_caller
+    from member_rows m
+    join profiles p on p.id = m.angler_id
+    join divisions d on d.id = m.division_id;
+  else
+    -- National mode, unchanged: everyone is in this standing on equal terms.
+    return query
+    select
+      n.angler_id,
+      p.username,
+      p.display_name,
+      p.avatar_path,
+      n.division_id,
+      d.name,
+      d.rank,
+      n.total_points,
+      n.counting_fish::integer,
+      n.best_fish_oz,
+      n.position::integer,
+      false,
+      n.angler_id = v_caller
     from national_league_table n
-    where p_division_id is null
-      and n.season_id = v_season.id
-  ) lt
-  join profiles p on p.id = lt.angler_id
-  join divisions d on d.id = lt.division_id;
+    join profiles p on p.id = n.angler_id
+    join divisions d on d.id = n.division_id
+    where n.season_id = v_season.id;
+  end if;
 
+  -- Below here: the ghost for anglers with no season_entries row at all.
+  -- They never reach league_table, so their score is reconstructed.
   if v_caller is null then
     return;
   end if;
@@ -1494,16 +1538,17 @@ begin
     and c.status = 'verified'
     and c.caught_at::date between v_season.starts_on and v_season.ends_on;
 
-  if p_division_id is null then
-    select 1 + count(*) into v_ghost_pos
-    from national_league_table n
-    where n.season_id = v_season.id and n.total_points > v_ghost_points;
+  -- In a division the ghost is unnumbered like any other unpaid row. In the
+  -- national table it keeps a real position, since that standing includes
+  -- everyone.
+  if p_division_id is not null then
+    v_ghost_pos := null;
   else
-    select 1 + count(*) into v_ghost_pos
-    from league_table l
-    where l.season_id = v_season.id
-      and l.division_id = v_ghost_div.id
-      and l.total_points > v_ghost_points;
+    select count(*)::integer + 1
+    into v_ghost_pos
+    from national_league_table n
+    where n.season_id = v_season.id
+      and n.total_points > v_ghost_points;
   end if;
 
   return query

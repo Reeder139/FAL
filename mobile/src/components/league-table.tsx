@@ -50,8 +50,14 @@ function TableRow({ row, showDivisionBadge, onJoin }: RowProps) {
         row.isYou && !row.isGhost && { backgroundColor: theme.surfaceElevated, borderColor: theme.primary },
         row.isGhost && { opacity: GHOST_OPACITY, borderStyle: 'dashed' },
       ]}>
+      {/* An unnumbered row still occupies the rank column, so every name,
+       * avatar and score stays on the same left edge as the rows above and
+       * below it. A dash rather than a blank: blank reads as a rendering
+       * fault, a dash reads as "deliberately not placed". */}
       <View style={styles.rankBadge}>
-        <Text style={[Typography.h3, { color: theme.textMuted }]}>{row.position}</Text>
+        <Text style={[Typography.h3, { color: theme.textMuted }]}>
+          {row.position === null ? '—' : row.position}
+        </Text>
       </View>
 
       {row.avatarUrl ? (

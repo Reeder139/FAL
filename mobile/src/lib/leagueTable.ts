@@ -12,8 +12,13 @@ export interface LeagueTableRow {
   points: number;
   countingFish: number;
   bestFishOz: number | null;
-  position: number;
-  /** A free member's projected row — not a real league entry. */
+  /** Null for anglers who aren't in the paid competition when this is a
+   * divisional table — they're shown in their rightful place by points but
+   * take no number, so a place in a cash-prize division always means a
+   * paying angler. Always set in the national table, where everyone counts. */
+  position: number | null;
+  /** Not in the paid competition: either no season entry at all, or one on
+   * the `open` tier. Rendered greyed out and unnumbered. */
   isGhost: boolean;
   isYou: boolean;
 }
@@ -29,23 +34,23 @@ interface RawRow {
   total_points: number;
   counting_fish: number;
   best_fish_oz: number | null;
-  position_in_table: number;
+  position_in_table: number | null;
   is_ghost: boolean;
   is_you: boolean;
 }
 
 /**
- * A league table plus, for free members, their own projected row.
+ * A league table, including rows for anglers who aren't in the paid
+ * competition.
  *
- * Pass a divisionId for a single division's table (positions ranked
- * in-division), or null for the national table (ranked across the season).
- * All of the ordering and position arithmetic — including where the ghost
- * slots in — happens in league_table_with_ghost() so it's computed once,
- * server-side.
+ * Pass a divisionId for a single division's table, or null for the national
+ * table. The position arithmetic happens in league_table_with_ghost() so it's
+ * computed once, server-side.
  *
- * A ghost can legitimately share a position number with the real row below
- * it: real members are ranked among themselves and the ghost is inserted
- * without renumbering them.
+ * Divisional tables number only paying anglers: everyone else appears in
+ * their rightful place on points but with a null position, so a place in a
+ * cash-prize division always belongs to someone who can actually win it. The
+ * national table numbers everyone, since it carries no prize.
  */
 export async function fetchLeagueTableWithGhost(divisionId: string | null): Promise<LeagueTableRow[]> {
   const { data, error } = await supabase.rpc('league_table_with_ghost', {
@@ -69,9 +74,10 @@ export async function fetchLeagueTableWithGhost(divisionId: string | null): Prom
     isYou: row.is_you,
   }));
 
-  // The RPC returns real rows then the ghost; interleave by position so the
-  // ghost lands in place. Ghost first on a tie, since its position is
-  // "one more than everyone strictly ahead", so it outscores whoever it
-  // shares a number with.
-  return rows.sort((a, b) => a.position - b.position || Number(b.isGhost) - Number(a.isGhost));
+  // Sorted on points, not position: unnumbered rows have no position to sort
+  // by, and points is what the order actually means in both modes. The
+  // reconstructed ghost arrives after the real rows, so this is what puts it
+  // in place. Ghost first on an exact tie, matching how its position used to
+  // be derived ("one more than everyone strictly ahead of it").
+  return rows.sort((a, b) => b.points - a.points || Number(b.isGhost) - Number(a.isGhost));
 }
