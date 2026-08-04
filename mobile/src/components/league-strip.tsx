@@ -43,18 +43,35 @@ export function LeagueStrip({ summary }: LeagueStripProps) {
   const theme = useTheme();
   const router = useRouter();
 
+  // No running season means there's nothing to join yet, so the prompt
+  // would be misleading rather than useful.
+  const showJoinPrompt = !summary.isPaidMember && summary.kind !== 'no_active_season';
+
   return (
-    <Pressable
-      onPress={() => router.push('/divisions')}
-      style={[styles.container, { backgroundColor: theme.primary, borderColor: theme.primary }]}>
+    <View style={[styles.container, { backgroundColor: theme.primary, borderColor: theme.primary }]}>
       <View style={styles.textGroup}>
-        <Text style={[Typography.label, { color: theme.onPrimaryStrong }]}>Your Current League Position</Text>
-        <Text style={[Typography.bodySmall, { color: theme.onPrimaryStrong }]} numberOfLines={1}>
-          {summaryText(summary)}
-        </Text>
+        {/* The standings area and the join link go to different places, so
+         * they're separate targets rather than one Pressable wrapping the
+         * whole strip. */}
+        <Pressable onPress={() => router.push('/divisions')}>
+          <Text style={[Typography.label, { color: theme.onPrimaryStrong }]}>
+            Your Current League Position
+          </Text>
+          <Text style={[Typography.bodySmall, styles.summaryLine, { color: theme.onPrimaryStrong }]} numberOfLines={1}>
+            {summaryText(summary)}
+          </Text>
+        </Pressable>
+
+        {showJoinPrompt && (
+          <Pressable onPress={() => router.push('/join')} style={styles.joinRow} hitSlop={Spacing.one}>
+            <Text style={[Typography.bodySmall, styles.joinLink, { color: theme.onPrimaryStrong }]}>
+              Join The League to win £20,000 Grand prize
+            </Text>
+          </Pressable>
+        )}
       </View>
       <Image source={require('@/assets/images/logo.jpg')} style={styles.logo} />
-    </Pressable>
+    </View>
   );
 }
 
@@ -71,7 +88,17 @@ const styles = StyleSheet.create({
   },
   textGroup: {
     flex: 1,
-    gap: Spacing.half,
+  },
+  summaryLine: {
+    marginTop: Spacing.half,
+  },
+  joinRow: {
+    // The gap that separates the prompt from the standings above it.
+    marginTop: Spacing.two,
+  },
+  joinLink: {
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   logo: {
     width: LOGO_SIZE,

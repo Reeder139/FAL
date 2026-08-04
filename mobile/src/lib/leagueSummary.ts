@@ -2,11 +2,18 @@ import { useEffect, useState } from 'react';
 
 import { supabase } from '@/lib/supabase';
 
-export type LeagueSummary =
-  | { kind: 'no_catches' }
-  | { kind: 'no_active_season' }
-  | { kind: 'member'; divisionName: string; position: number | null; divisionMemberCount: number; points: number }
-  | { kind: 'free'; points: number; position: number | null; divisionMemberCount: number; divisionName: string | null };
+/** True only for a `competitor`-tier entry in the running season. Everyone
+ * else — `open` tier, or no season_entries row at all — is a non-paid
+ * member and gets the "Join the League" prompt on the summary strip. */
+type PaidFlag = { isPaidMember: boolean };
+
+export type LeagueSummary = PaidFlag &
+  (
+    | { kind: 'no_catches' }
+    | { kind: 'no_active_season' }
+    | { kind: 'member'; divisionName: string; position: number | null; divisionMemberCount: number; points: number }
+    | { kind: 'free'; points: number; position: number | null; divisionMemberCount: number; divisionName: string | null }
+  );
 
 /**
  * Drives the league summary strip. Checked in this order:
@@ -20,6 +27,11 @@ export type LeagueSummary =
  * 4. No season_entries row -> hypothetical_league_position, the same
  *    "mirror the real scoring without requiring a row" approach the catch
  *    result card uses for hypothetical_catch_preview.
+ *
+ * The season and entry lookups now happen before the no_catches check
+ * rather than after, because paid status has to be known for every branch
+ * — a paid member with no catches yet shouldn't be told to go and join.
+ * The ordering of the branches themselves is unchanged.
  */
 export async function fetchLeagueSummary(): Promise<LeagueSummary | null> {
   const {
@@ -27,31 +39,34 @@ export async function fetchLeagueSummary(): Promise<LeagueSummary | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { count: catchCount } = await supabase
-    .from('catches')
-    .select('id', { count: 'exact', head: true })
-    .eq('angler_id', user.id);
-  if (!catchCount) return { kind: 'no_catches' };
-
   const today = new Date().toISOString().slice(0, 10);
-  const { data: season } = await supabase
-    .from('seasons')
-    .select('id')
-    .in('status', ['open', 'running'])
-    .lte('starts_on', today)
-    .gte('ends_on', today)
-    .order('starts_on', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!season) return { kind: 'no_active_season' };
+  const [{ count: catchCount }, { data: season }] = await Promise.all([
+    supabase.from('catches').select('id', { count: 'exact', head: true }).eq('angler_id', user.id),
+    supabase
+      .from('seasons')
+      .select('id')
+      .in('status', ['open', 'running'])
+      .lte('starts_on', today)
+      .gte('ends_on', today)
+      .order('starts_on', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
-  const { data: entry } = await supabase
-    .from('season_entries')
-    .select('division_id')
-    .eq('season_id', season.id)
-    .eq('angler_id', user.id)
-    .is('left_at', null)
-    .maybeSingle();
+  const { data: entry } = season
+    ? await supabase
+        .from('season_entries')
+        .select('division_id, tier')
+        .eq('season_id', season.id)
+        .eq('angler_id', user.id)
+        .is('left_at', null)
+        .maybeSingle()
+    : { data: null };
+
+  const isPaidMember = entry?.tier === 'competitor';
+
+  if (!catchCount) return { kind: 'no_catches', isPaidMember };
+  if (!season) return { kind: 'no_active_season', isPaidMember };
 
   if (entry) {
     const [{ data: table }, { data: division }, { count: memberCount }] = await Promise.all([
@@ -72,6 +87,7 @@ export async function fetchLeagueSummary(): Promise<LeagueSummary | null> {
 
     return {
       kind: 'member',
+      isPaidMember,
       divisionName: division?.name ?? '—',
       // No league_table row means nothing verified in-period yet — points-
       // only, same "don't show a fabricated rank" principle as the <20
@@ -87,10 +103,11 @@ export async function fetchLeagueSummary(): Promise<LeagueSummary | null> {
   // A season exists, but no division matches this angler's declared PB —
   // a data-configuration gap (divisions should cover the full range), not
   // "no catches". Closest existing state: nothing seasonal to show.
-  if (!hyp) return { kind: 'no_active_season' };
+  if (!hyp) return { kind: 'no_active_season', isPaidMember };
 
   return {
     kind: 'free',
+    isPaidMember,
     points: hyp.hypothetical_season_total,
     position: hyp.division_member_count >= 20 ? hyp.hypothetical_position : null,
     divisionMemberCount: hyp.division_member_count,
