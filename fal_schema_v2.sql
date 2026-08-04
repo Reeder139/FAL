@@ -542,9 +542,6 @@ where c.status = 'verified'
   and c.caught_at >= se.joined_at
   and (se.left_at is null or c.caught_at < se.left_at);
 
--- TODO before launch: the "one counting fish per 24 hours" rule filters here,
--- not at submission. Anglers should still be able to POST every fish they catch.
-
 create or replace view league_table
 with (security_invoker = on) as
 select

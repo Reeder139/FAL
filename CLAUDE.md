@@ -97,6 +97,19 @@ inside the season's date range; `league_table` then sums each angler's top
 `counting_fish` scores per division. A catch's `rank_in_season` there is what decides
 whether it's a counting fish.
 
+### No cap on counting fish per session or per day
+
+**There is no limit on how many of an angler's fish can count within a session or
+a day, and one must not be implemented.** An angler's counting fish are simply
+their top `counting_fish` scores of the season by `rank_in_season` — nothing
+filters them by time.
+
+A "one counting fish per 24 hours" rule was once planned and is now **dropped**.
+It was never built; it existed only as a TODO comment reserving a filter in
+`scored_catches`, removed in `20260804060000_drop_24h_counting_fish_rule.sql`.
+Treat any resurfacing of it — in older notes, a rules document, or a comment in a
+superseded migration — as stale, not as work outstanding.
+
 ## Evidence and fraud prevention
 
 Trust is tiered and structural, not just policy:
@@ -148,8 +161,3 @@ Every table has RLS enabled — no exceptions. Notable patterns:
 - The `service_role` key bypasses RLS entirely — that's how the admin console and
   edge functions operate. It must never ship inside the Expo app.
 
-## Known gaps (see schema comments)
-
-- The "one counting fish per 24 hours" rule is not yet enforced anywhere — it's
-  meant to filter in `scored_catches`, not at submission time, so anglers can still
-  post every fish they catch. Not implemented yet.
