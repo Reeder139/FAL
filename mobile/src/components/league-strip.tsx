@@ -12,7 +12,7 @@ const JOIN_BANNER_RATIO = 700 / 189;
 /** Ceiling on the banner's width. At phone width the column share already
  * lands under this, so it only bites on wider viewports — where the banner
  * would otherwise keep growing with the 800px content column. */
-const JOIN_BANNER_MAX_WIDTH = 150;
+const JOIN_BANNER_MAX_WIDTH = 180;
 
 // TODO: real trend delta once we have standings history to diff against —
 // hardcoded placeholder for now, per the design ask.
@@ -101,7 +101,10 @@ const styles = StyleSheet.create({
     // sits only a shade off the page background, so the border is what
     // actually defines its edge.
     borderWidth: 1,
-    paddingVertical: Spacing.two,
+    // Tight vertical padding: the banner is the tallest child, so every
+    // pixel saved here is a pixel the banner can grow into at the same
+    // strip depth.
+    paddingVertical: Spacing.one,
     paddingHorizontal: Spacing.three,
     borderRadius: Radii.xs,
   },
@@ -124,6 +127,10 @@ const styles = StyleSheet.create({
     // the standings floating in the middle of it. Past phone width the
     // banner should stay put rather than grow.
     maxWidth: JOIN_BANNER_MAX_WIDTH,
+    // Guards the aspect ratio: if a parent ever stretched this item, the
+    // box's height would be set by the stretch rather than by aspectRatio
+    // and the artwork would squash. Centring keeps height content-driven.
+    alignSelf: 'center',
   },
   joinBannerBox: {
     width: '100%',
