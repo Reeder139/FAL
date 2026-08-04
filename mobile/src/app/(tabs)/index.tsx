@@ -99,32 +99,21 @@ export default function HomeScreen() {
       <SuggestedFollowsRail />
 
       {tab && (
-        <>
-          <View style={styles.tabsWrapper}>
-            <FeedTabs value={tab} onChange={handleTabChange} showLeagueTab={showLeagueTab} />
-          </View>
+        <View style={styles.tabsWrapper}>
+          <FeedTabs value={tab} onChange={handleTabChange} showLeagueTab={showLeagueTab} />
 
-          {/* The icons get their own line so rules can sit on the true centre.
-           * Sharing the tabs' row made that impossible: three pills run to
-           * x275 of a 390px screen whose midpoint is x195, so a centred icon
-           * landed on the My League pill and took its taps. Squeezing the
-           * pills clear of the middle would need ~40% off their labels.
-           *
-           * Rules is centred by absolute positioning rather than by spacers —
-           * search is the only other child, so spacers would centre rules in
-           * the space search leaves rather than on the row itself. */}
-          <View style={styles.iconRow}>
-            <View style={styles.iconRowCentre} pointerEvents="box-none">
-              <Pressable
-                onPress={showRules}
-                accessibilityRole="button"
-                accessibilityLabel="The rules of the game"
-                hitSlop={Spacing.two}>
-                <Image source={require('@/assets/images/rules-icon.png')} style={styles.rulesIcon} />
-              </Pressable>
-            </View>
-
-            <View style={styles.headerSpacer} />
+          {/* Both icons ride the pills' row, pushed right by the spacer. They
+           * sit in their own group so the gap between them is theirs alone —
+           * a gap on the wrapper would space the pills and the spacer too. */}
+          <View style={styles.headerSpacer} />
+          <View style={styles.iconGroup}>
+            <Pressable
+              onPress={showRules}
+              accessibilityRole="button"
+              accessibilityLabel="The rules of the game"
+              hitSlop={Spacing.two}>
+              <Image source={require('@/assets/images/rules-icon.png')} style={styles.rulesIcon} />
+            </Pressable>
             <Pressable
               onPress={() => router.push('/search-anglers')}
               accessibilityRole="button"
@@ -133,7 +122,7 @@ export default function HomeScreen() {
               <Image source={require('@/assets/images/search-icon.png')} style={styles.searchIcon} />
             </Pressable>
           </View>
-        </>
+        </View>
       )}
 
       {loading || !tab ? (
@@ -198,28 +187,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
   },
-  iconRow: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.two,
-  },
-  /** Spans the row so its child lands on the row's own centre, independent of
-   * what else is on the line. box-none so it only takes taps on the icon
-   * itself and the empty space either side stays inert. */
-  iconRowCentre: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: Spacing.two,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   headerSpacer: {
     flex: 1,
+  },
+  iconGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   searchIcon: {
     width: SearchIconSize,
