@@ -8,7 +8,7 @@ import { ordinal } from '@/lib/units';
 
 /** Source dimensions of the prepared banner (see
  * scripts/prepare-join-banner.mjs). */
-const JOIN_BANNER_RATIO = 700 / 190;
+const JOIN_BANNER_RATIO = 700 / 189;
 
 // TODO: real trend delta once we have standings history to diff against —
 // hardcoded placeholder for now, per the design ask.

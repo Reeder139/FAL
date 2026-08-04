@@ -1,17 +1,19 @@
 // Prepares the "Join the League" banner for the League Position strip from
-// the source art in <repo>/Images/Join League 1.png.
+// the source art in <repo>/Images/.
 //
-// The source needs more than a resize. It's a 1774x887 opaque RGB PNG with
-// no alpha at all — the banner occupies a 1743x475 band through the middle
-// and everything around it is near-white (253,253,253). Dropped onto the
-// strip as-is, that reads as a white box around the banner rather than as
-// transparency.
+// The source art needs more than a resize. It arrives as an opaque PNG with
+// no alpha at all: the banner sits in a band through the middle and
+// everything around it is flat backdrop. Dropped onto the strip as-is that
+// reads as a coloured box around the banner rather than as transparency.
 //
-// Keying it out needs care: the banner's own headline text is white too, so
-// a plain "white -> transparent" pass would punch holes through the
-// lettering. Instead this flood-fills inward from the border, so only
-// background actually connected to the edge is cleared; anything enclosed
-// by the banner (the headline, the trophy highlights) is untouched.
+// Keying it out needs care, and the naive approach fails on both versions
+// of the art for different reasons — v1's backdrop was near-white and so is
+// its headline text, v2's backdrop is the same gold family as the trophy
+// and the "20K" lettering. A plain "this colour -> transparent" pass would
+// punch holes through the artwork either way. So this samples the backdrop
+// from the corners and flood-fills inward from the border, clearing only
+// what's actually connected to the edge; anything enclosed by the banner
+// body is untouched regardless of its colour.
 //
 // Run from mobile/:  node scripts/prepare-join-banner.mjs
 // Requires sharp:    npm install --no-save sharp
@@ -24,12 +26,15 @@ import path from 'node:path';
 
 import sharp from 'sharp';
 
-const SRC = path.resolve('..', 'Images', 'Join League 1.png');
+const SRC = path.resolve('..', 'Images', 'Join League 2.png');
 const OUT_DIR = path.resolve('assets', 'images');
 const OUT = path.join(OUT_DIR, 'join-league-banner.png');
 
-/** Anything at or above this on all three channels counts as backdrop. */
-const WHITE_CUTOFF = 232;
+/** How far a pixel may sit from the sampled backdrop colour and still count
+ * as backdrop (straight RGB distance). Generous enough to swallow the
+ * vignette across v2's gold field — which drifts by ~20 per channel corner
+ * to centre — without reaching the near-black banner body. */
+const KEY_TOLERANCE = 72;
 /** Bundled width. The strip renders it around 170px wide, so this is ~4x
  * for high-density screens without carrying the full source resolution. */
 const TARGET_WIDTH = 700;
@@ -41,7 +46,20 @@ async function main() {
 
   const { data, info } = await sharp(SRC).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width: w, height: h, channels } = info;
-  const isBackdrop = (i) => data[i] >= WHITE_CUTOFF && data[i + 1] >= WHITE_CUTOFF && data[i + 2] >= WHITE_CUTOFF;
+
+  // Sample the backdrop from the four corners rather than assuming a
+  // colour, so the same pass works whether the art ships on white or on a
+  // gold field.
+  const at = (x, y) => (y * w + x) * channels;
+  const corners = [at(2, 2), at(w - 3, 2), at(2, h - 3), at(w - 3, h - 3)];
+  const key = [0, 1, 2].map((ch) => Math.round(corners.reduce((sum, i) => sum + data[i + ch], 0) / corners.length));
+
+  const isBackdrop = (i) => {
+    const dr = data[i] - key[0];
+    const dg = data[i + 1] - key[1];
+    const db = data[i + 2] - key[2];
+    return dr * dr + dg * dg + db * db <= KEY_TOLERANCE * KEY_TOLERANCE;
+  };
 
   // Flood fill inward from every border pixel. An explicit stack rather
   // than recursion — 1.5M pixels would blow the call stack.
@@ -96,7 +114,7 @@ async function main() {
   const after = (await stat(OUT)).size;
   const outMeta = await sharp(OUT).metadata();
 
-  console.log(`  source   ${w}x${h}  ${kb(before)}`);
+  console.log(`  source   ${w}x${h}  ${kb(before)}  backdrop rgb(${key.join(',')})`);
   console.log(`  cropped  ${cropW}x${cropH}  (ratio ${(cropW / cropH).toFixed(3)})`);
   console.log(`  output   ${outMeta.width}x${outMeta.height}  ${kb(after)}  alpha=${outMeta.hasAlpha}`);
 }
