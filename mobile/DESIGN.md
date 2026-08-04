@@ -178,6 +178,29 @@ Don't invent new division colors per screen — always pull `divisionOne` /
 | `LeagueStripBannerHeight` | `{ min: 28, max: 48 }` | Join banner in the League Position strip, clamped — see below |
 | `LeagueStripTextMinWidth` | 208 | Width the strip reserves for its text column before sizing the banner |
 | `SearchIconSize` | 28 | Member-search icon on the feed, right-aligned on the tab pills' row |
+| `NavIconSize` | 32 | Bottom nav bar icons — bounded by tab width (~56px each), not height |
+
+### Bottom nav bar
+
+The bar is icon-only: the artwork replaced the text labels entirely, so each
+tab's name survives only as an accessibility label. The source art ships each
+name baked in underneath its glyph, and `scripts/prepare-nav-icons.mjs` crops
+that caption off — five tabs plus the raised Catch button leave ~56px of
+width per tab, at which the caption would render about 4px tall.
+
+Glyphs are cropped to their own ink and padded back to a common square,
+because the sources vary from 0.80 to 1.11 in aspect and fill different
+fractions of their canvas. Without that the podium would out-weigh the feed
+page in the bar at identical box sizes.
+
+The selected tab is shown two ways: the `backgroundSelected` pill behind it,
+and full opacity against 0.65 for the rest. The icons are full-colour gold,
+so a "muted" color token would fight the artwork — opacity is what dims them
+without recolouring.
+
+Bar depth is 64px of visible bar inside a 96px footprint (the outer
+`Spacing.three` padding sits either side of it), up from 50/82 when the bar
+held two-line text labels.
 
 ### The League Position strip's join banner
 

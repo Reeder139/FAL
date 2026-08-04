@@ -410,3 +410,9 @@ export const LeagueStripTextMinWidth = 208;
  * the pills' height (bodySmall on ButtonVariants' tab padding) so the row
  * reads as one band rather than the icon setting its own height. */
 export const SearchIconSize = 28;
+/** Bottom nav bar icons. Bounded by width, not height: five tabs plus the
+ * raised Catch button leave ~56px per tab at phone width, and the icon needs
+ * to sit inside that with padding either side. These replaced the text
+ * labels, so the icon is the whole target — there's no caption under it to
+ * share the height with. */
+export const NavIconSize = 32;

@@ -1,12 +1,11 @@
 import { Tabs, TabList, TabTrigger, TabSlot, TabTriggerSlotProps, TabListProps } from 'expo-router/ui';
 import { Children } from 'react';
-import { Pressable, View, StyleSheet } from 'react-native';
+import { Image, Pressable, View, StyleSheet, type ImageSourcePropType } from 'react-native';
 
 import { FAB_SIZE } from './catch-fab';
-import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-import { MaxContentWidth, Spacing, Typography } from '@/constants/theme';
+import { MaxContentWidth, NavIconSize, Spacing } from '@/constants/theme';
 
 // The raised Catch button floats centered over this bar (see catch-fab.tsx)
 // — it isn't one of the TabTriggers below. Reserve a gap the same width as
@@ -23,19 +22,22 @@ export default function AppTabs() {
       <TabList asChild>
         <CustomTabList>
           <TabTrigger name="home" href="/" asChild>
-            <TabButton>Feed</TabButton>
+            <TabButton icon={require('@/assets/images/nav/feed.png')} label="Feed" />
           </TabTrigger>
           <TabTrigger name="national-league" href="/national-league" asChild>
-            <TabButton>National League</TabButton>
+            <TabButton
+              icon={require('@/assets/images/nav/national-league.png')}
+              label="National League"
+            />
           </TabTrigger>
           <TabTrigger name="divisions" href="/divisions" asChild>
-            <TabButton>Divisions</TabButton>
+            <TabButton icon={require('@/assets/images/nav/divisions.png')} label="Divisions" />
           </TabTrigger>
           <TabTrigger name="leaders" href="/leaders" asChild>
-            <TabButton>Leaders</TabButton>
+            <TabButton icon={require('@/assets/images/nav/leaders.png')} label="Leaders" />
           </TabTrigger>
           <TabTrigger name="profile" href="/profile" asChild>
-            <TabButton>Profile</TabButton>
+            <TabButton icon={require('@/assets/images/nav/profile.png')} label="Profile" />
           </TabTrigger>
         </CustomTabList>
       </TabList>
@@ -43,21 +45,37 @@ export default function AppTabs() {
   );
 }
 
-export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps) {
+type TabButtonProps = TabTriggerSlotProps & {
+  icon: ImageSourcePropType;
+  /** The tab's name. Not drawn — the artwork is the label now — but carried
+   * as the accessible name, since a screen reader can't read a picture. */
+  label: string;
+};
+
+export function TabButton({ icon, label, isFocused, ...props }: TabButtonProps) {
   return (
-    <Pressable {...props} style={({ pressed }) => [styles.tabButtonPressable, pressed && styles.pressed]}>
+    <Pressable
+      {...props}
+      accessibilityRole="tab"
+      accessibilityLabel={label}
+      // aria-selected set directly rather than via accessibilityState:
+      // react-native-web renders this trigger as an <a>, and the state prop
+      // doesn't reach the DOM there — leaving a role="tab" with no selected
+      // state, which is worse than no role at all.
+      aria-selected={isFocused}
+      style={({ pressed }) => [styles.tabButtonPressable, pressed && styles.pressed]}>
       <ThemedView
         type={isFocused ? 'backgroundSelected' : 'backgroundElement'}
         style={styles.tabButtonView}>
-        {/* Two lines, centred: "National League" can't fit one line in the
-         * ~47px each tab gets at phone width. The others stay single-line
-         * and centre against it. */}
-        <ThemedText
-          style={[Typography.navLabel, styles.tabLabel]}
-          themeColor={isFocused ? 'text' : 'textSecondary'}
-          numberOfLines={2}>
-          {children}
-        </ThemedText>
+        {/* Unfocused icons are dimmed rather than recoloured: the artwork is
+         * full-colour gold, so tinting it to a "muted" token would fight the
+         * asset. Opacity keeps the selected tab obvious while leaving every
+         * icon recognisable. */}
+        <Image
+          source={icon}
+          style={[styles.icon, !isFocused && styles.iconUnfocused]}
+          resizeMode="contain"
+        />
       </ThemedView>
     </Pressable>
   );
@@ -112,11 +130,17 @@ const styles = StyleSheet.create({
   tabButtonView: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.one,
+    // Deeper than the old text labels needed, so the icons sit in the bar
+    // with room around them rather than filling it edge to edge.
+    paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.half,
     borderRadius: Spacing.three,
   },
-  tabLabel: {
-    textAlign: 'center',
+  icon: {
+    width: NavIconSize,
+    height: NavIconSize,
+  },
+  iconUnfocused: {
+    opacity: 0.65,
   },
 });
