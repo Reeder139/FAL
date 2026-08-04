@@ -24,6 +24,16 @@ const JOIN_BANNER_RATIO = 700 / 139;
 // hardcoded placeholder for now, per the design ask.
 const PLACEHOLDER_DELTA = '▲3';
 
+/** "Division 3" -> "Div 3", for the strip only.
+ *
+ * Display-only on purpose: the division's real name comes from the database
+ * and is what the league pages, the leaders cards and the ghost row all
+ * show. This strip is the one place fighting for width — it shares a row
+ * with the join banner — so it's the one place that abbreviates. */
+function shortDivision(name: string): string {
+  return name.replace(/^Division\b/i, 'Div');
+}
+
 function summaryText(summary: LeagueSummary): string {
   switch (summary.kind) {
     case 'no_catches':
@@ -31,7 +41,7 @@ function summaryText(summary: LeagueSummary): string {
     case 'no_active_season':
       return "No season is open right now — you'll see your score once one starts";
     case 'member': {
-      const parts = [summary.divisionName];
+      const parts = [shortDivision(summary.divisionName)];
       if (summary.position !== null) parts.push(`${ordinal(summary.position)} of ${summary.divisionMemberCount}`);
       parts.push(`${summary.points.toFixed(1)} pts ${PLACEHOLDER_DELTA}`);
       return parts.join(' · ');
@@ -40,7 +50,7 @@ function summaryText(summary: LeagueSummary): string {
       const base = `${summary.points.toFixed(1)} pts this season`;
       const positionPart =
         summary.position !== null && summary.divisionName
-          ? ` · you'd be ${ordinal(summary.position)} in ${summary.divisionName}`
+          ? ` · you'd be ${ordinal(summary.position)} in ${shortDivision(summary.divisionName)}`
           : '';
       return `${base}${positionPart} — Join`;
     }
