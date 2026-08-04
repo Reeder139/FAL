@@ -10,7 +10,6 @@ export interface SuggestedFollowCard {
   divisionName: string | null;
   divisionRank: number | null;
   positionInDivision: number | null;
-  bestFishOz: number | null;
 }
 
 /** Backed entirely by the suggested_follows() RPC — ordering, division
@@ -24,6 +23,9 @@ interface SuggestedFollowRow {
   division_name: string | null;
   division_rank: number | null;
   position_in_division: number | null;
+  /** Still returned by the RPC but no longer surfaced — the rail dropped its
+   * best-fish line to keep the cards compact. Left on the row type as a
+   * record of the function's shape rather than deleted. */
   best_fish_oz: number | null;
 }
 
@@ -39,7 +41,6 @@ export async function fetchSuggestedFollows(): Promise<SuggestedFollowCard[]> {
     divisionName: row.division_name,
     divisionRank: row.division_rank,
     positionInDivision: row.position_in_division,
-    bestFishOz: row.best_fish_oz,
   }));
 }
 

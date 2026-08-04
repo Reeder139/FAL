@@ -174,7 +174,7 @@ Don't invent new division colors per screen — always pull `divisionOne` /
 |---|---|---|
 | `MaxContentWidth` | 800 | Content column cap on wide/web viewports — every screen centers within this instead of stretching edge to edge |
 | `BottomTabInset` | 50 (iOS) / 80 (Android) / 0 (web) | Extra bottom padding on scrollable content so it clears the native tab bar |
-| `SuggestedFollowsRailHeight` | 164 | Feed's suggested-follows rail — fits a circular avatar plus name, division/position, best fish and the follow button (~147px of content) |
+| `SuggestedFollowsRailHeight` | 146 | Feed's suggested-follows rail — fits a circular avatar plus name, division/position and the follow button (card height is `avatar + 64`, so 140px at the widest avatar) |
 | `LeagueStripBannerHeight` | `{ min: 28, max: 48 }` | Join banner in the League Position strip, clamped — see below |
 | `LeagueStripTextMinWidth` | 208 | Width the strip reserves for its text column before sizing the banner |
 | `SearchIconSize` | 28 | Member-search icon on the feed, right-aligned on the tab pills' row |

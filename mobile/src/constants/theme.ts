@@ -376,12 +376,15 @@ export const InputStyle = {
 // ---------------------------------------------------------------------------
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
-/** Suggested-follows rail on the feed. Sized to fit a circular avatar
- * (one column wide, ~65px at phone width) plus the name, division and
- * best-fish lines and the follow button beneath it — that content
- * measures ~147px, so this leaves a little headroom for larger system
- * font settings without opening a visible gap under the row. */
-export const SuggestedFollowsRailHeight = 164;
+/** Suggested-follows rail on the feed. Sized to fit a circular avatar plus
+ * the name and division lines and the follow button beneath it.
+ *
+ * The card's height is `avatar + 64`, and the avatar is as wide as the
+ * column (capped at MAX_CARD_WIDTH), so the tallest case is the 76px avatar
+ * on a wide viewport — 140px of content. The few px above that are headroom
+ * for larger system font settings, so bumping the text size doesn't clip the
+ * follow button. */
+export const SuggestedFollowsRailHeight = 146;
 /** Join banner in the League Position strip, as a height range rather than
  * a width. Height is the meaningful dimension: the banner is the tallest
  * thing in the row, so it sets the strip's depth and the strip hugs it —

@@ -6,7 +6,7 @@ import { FollowButton } from '@/components/follow-button';
 import { MaxContentWidth, Radii, Spacing, SuggestedFollowsRailHeight, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { dismissSuggestion, fetchSuggestedFollows, type SuggestedFollowCard } from '@/lib/suggestedFollows';
-import { formatWeightOz, ordinal } from '@/lib/units';
+import { ordinal } from '@/lib/units';
 
 const DIVISION_COLOR_KEYS = ['divisionOne', 'divisionTwo', 'divisionThree'] as const;
 
@@ -55,12 +55,6 @@ function Card({ card, onDismiss }: { card: SuggestedFollowCard; onDismiss: (id: 
       {card.divisionRank !== null && card.positionInDivision !== null && (
         <Text style={[Typography.caption, { color: accent }]} numberOfLines={1}>
           Div {card.divisionRank} · {ordinal(card.positionInDivision)}
-        </Text>
-      )}
-
-      {card.bestFishOz !== null && (
-        <Text style={[Typography.caption, { color: theme.textMuted }]} numberOfLines={1}>
-          {formatWeightOz(card.bestFishOz)}
         </Text>
       )}
 
