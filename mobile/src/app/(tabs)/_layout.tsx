@@ -14,13 +14,23 @@ import { useAuth } from '@/providers/auth-provider';
  * again on the way past. */
 const LEAGUE_ROUTE = '/league';
 
+/** Whether the upsell has already run this session.
+ *
+ * Module scope on purpose: it has to outlive this component (the layout
+ * remounts on sign-out/in) but not the process, which is exactly what
+ * "once per session" means — it clears when the app is next launched.
+ * Storing it would make it once per install; component state would make it
+ * once per mount, which is close enough to every visit to be annoying. */
+let promptShownThisSession = false;
+
 export default function TabsLayout() {
   const theme = useTheme();
   const { session, loading, needsOnboarding } = useAuth();
 
-  // Upsell card for members who aren't in the paid competition, shown when
-  // they land on the League tab. It lives here rather than in the league
-  // screen so it renders after the tab bar and Catch button and covers them.
+  // Upsell card for members who aren't in the paid competition, shown once a
+  // session the first time they land on the League tab. It lives here rather
+  // than in the league screen so it renders after the tab bar and Catch
+  // button and covers them.
   //
   // Keyed on the pathname changing rather than a focus callback: the focus
   // hook re-runs while the screen stays focused, so setting visible=true
@@ -32,7 +42,10 @@ export default function TabsLayout() {
   const canPrompt = summary !== null && !summary.isPaidMember;
   const [promptVisible, setPromptVisible] = useState(false);
   useEffect(() => {
-    if (onLeagueTab && canPrompt) setPromptVisible(true);
+    if (onLeagueTab && canPrompt && !promptShownThisSession) {
+      promptShownThisSession = true;
+      setPromptVisible(true);
+    }
   }, [onLeagueTab, canPrompt]);
 
   if (loading) {

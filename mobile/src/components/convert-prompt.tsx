@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -36,10 +37,28 @@ const PROMPTS: Prompt[] = [
   },
 ];
 
-/** Which card the next appearance gets. Module scope rather than component
- * state so it survives the prompt unmounting between visits — otherwise it
- * would reset and show the same card every time instead of rotating. */
-let nextPromptIndex = 0;
+const ROTATION_KEY = 'fal.convertPromptIndex';
+
+/**
+ * Which card to show, advancing the rotation for next time.
+ *
+ * Persisted rather than held in memory because the prompt now appears once
+ * per session: an in-memory counter would reset on every launch alongside it,
+ * so the first card would win every session and the second would never be
+ * seen. Storage is what makes the rotation actually rotate.
+ */
+async function takeNextPrompt(): Promise<Prompt> {
+  let index = 0;
+  try {
+    const stored = await AsyncStorage.getItem(ROTATION_KEY);
+    const parsed = stored === null ? 0 : Number.parseInt(stored, 10);
+    if (Number.isFinite(parsed) && parsed >= 0) index = parsed % PROMPTS.length;
+    await AsyncStorage.setItem(ROTATION_KEY, String((index + 1) % PROMPTS.length));
+  } catch {
+    // Non-critical — worst case the rotation restarts. Still show a card.
+  }
+  return PROMPTS[index];
+}
 
 /** Fraction of the card, from its top-right corner, treated as the close
  * button. Both cards have an X baked into the artwork at roughly x 86-100%,
@@ -77,19 +96,36 @@ type ConvertPromptProps = {
 export function ConvertPrompt({ visible, onDismiss }: ConvertPromptProps) {
   const router = useRouter();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const [prompt, setPrompt] = useState<Prompt>(PROMPTS[0]);
+  // Null until the rotation has been read for this appearance, which is
+  // what stops the first card flashing up and being swapped for the second
+  // once storage answers.
+  const [prompt, setPrompt] = useState<Prompt | null>(null);
   const wasVisible = useRef(false);
 
-  // Advance the rotation on the transition into visible, not on every
-  // render — otherwise a resize or a re-render would swap the card while
+  // Take the next card on the transition into visible, not on every render —
+  // otherwise a resize would advance the rotation and swap the card while
   // the angler is looking at it.
   useEffect(() => {
+    let cancelled = false;
     if (visible && !wasVisible.current) {
-      setPrompt(PROMPTS[nextPromptIndex % PROMPTS.length]);
-      nextPromptIndex += 1;
+      takeNextPrompt().then((next) => {
+        if (!cancelled) setPrompt(next);
+      });
+    } else if (!visible) {
+      setPrompt(null);
     }
     wasVisible.current = visible;
+    return () => {
+      cancelled = true;
+    };
   }, [visible]);
+
+  const handleJoin = () => {
+    onDismiss();
+    router.push('/join');
+  };
+
+  if (!visible || !prompt) return null;
 
   // Fit by width first, then pull back if that makes it too tall for the
   // screen. Doing it in this order keeps the card as large as it can be
@@ -101,13 +137,6 @@ export function ConvertPrompt({ visible, onDismiss }: ConvertPromptProps) {
     cardHeight = maxHeight;
     cardWidth = cardHeight * prompt.ratio;
   }
-
-  const handleJoin = () => {
-    onDismiss();
-    router.push('/join');
-  };
-
-  if (!visible) return null;
 
   return (
     <View style={styles.root}>
