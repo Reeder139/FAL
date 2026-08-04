@@ -7,6 +7,7 @@ import { AppButton } from '@/components/app-button';
 import { FormField } from '@/components/form-field';
 import { MaxContentWidth, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { absoluteUrl } from '@/lib/siteUrl';
 import { supabase } from '@/lib/supabase';
 
 export default function ForgotPasswordScreen() {
@@ -19,7 +20,18 @@ export default function ForgotPasswordScreen() {
   const handleSubmit = async () => {
     setError(null);
     setLoading(true);
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim());
+    // redirectTo only when a site URL is configured. Left off, Supabase
+    // falls back to the Site URL set in its own dashboard, which is the
+    // behaviour this had before and is still correct.
+    //
+    // Whatever EXPO_PUBLIC_SITE_URL is set to MUST also be on Supabase's
+    // redirect allow-list (Authentication -> URL Configuration), or it
+    // rejects the link and reset stops working entirely.
+    const redirectTo = absoluteUrl('/login');
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      email.trim(),
+      redirectTo ? { redirectTo } : undefined
+    );
     setLoading(false);
     if (resetError) {
       setError(resetError.message);
