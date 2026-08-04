@@ -169,7 +169,10 @@ const styles = StyleSheet.create({
     borderRadius: Radii.md,
     paddingVertical: Spacing.one,
     paddingHorizontal: Spacing.three,
-    marginBottom: Spacing.one,
+    // Deliberately wider than the gap below the link row: this is the seam
+    // between the season's stats and the two navigation cards, so it should
+    // read as a break between groups rather than as list spacing.
+    marginBottom: Spacing.three,
   },
   infoStat: {
     gap: Spacing.half,
