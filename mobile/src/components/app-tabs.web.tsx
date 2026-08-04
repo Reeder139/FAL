@@ -25,8 +25,8 @@ export default function AppTabs() {
           <TabTrigger name="home" href="/" asChild>
             <TabButton>Feed</TabButton>
           </TabTrigger>
-          <TabTrigger name="ff-league" href="/ff-league" asChild>
-            <TabButton>FF League</TabButton>
+          <TabTrigger name="national-league" href="/national-league" asChild>
+            <TabButton>National League</TabButton>
           </TabTrigger>
           <TabTrigger name="divisions" href="/divisions" asChild>
             <TabButton>Divisions</TabButton>
@@ -49,10 +49,13 @@ export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps
       <ThemedView
         type={isFocused ? 'backgroundSelected' : 'backgroundElement'}
         style={styles.tabButtonView}>
+        {/* Two lines, centred: "National League" can't fit one line in the
+         * ~47px each tab gets at phone width. The others stay single-line
+         * and centre against it. */}
         <ThemedText
-          style={Typography.navLabel}
+          style={[Typography.navLabel, styles.tabLabel]}
           themeColor={isFocused ? 'text' : 'textSecondary'}
-          numberOfLines={1}>
+          numberOfLines={2}>
           {children}
         </ThemedText>
       </ThemedView>
@@ -108,8 +111,12 @@ const styles = StyleSheet.create({
   },
   tabButtonView: {
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: Spacing.one,
     paddingHorizontal: Spacing.half,
     borderRadius: Spacing.three,
+  },
+  tabLabel: {
+    textAlign: 'center',
   },
 });

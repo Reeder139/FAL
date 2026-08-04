@@ -553,7 +553,7 @@ join seasons s on s.id = sc.season_id
 where sc.rank_in_season <= s.counting_fish
 group by sc.season_id, sc.division_id, sc.angler_id, s.counting_fish;
 
--- The "FF League": one national standing across every division in a
+-- The "National League": one standing across every division in a
 -- season. Bragging rights only — no prize money attaches to it, unlike the
 -- divisional tables.
 --

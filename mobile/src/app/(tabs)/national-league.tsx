@@ -87,7 +87,7 @@ export default function FFLeagueScreen() {
       <View style={styles.content}>
         {/* Artwork banner goes here once supplied. */}
         <View style={styles.header}>
-          <Text style={[Typography.h1, { color: theme.text }]}>FF League</Text>
+          <Text style={[Typography.h1, { color: theme.text }]}>National League</Text>
           {standings && (
             <Text style={[Typography.bodySmall, { color: theme.primary }]}>{standings.seasonName}</Text>
           )}

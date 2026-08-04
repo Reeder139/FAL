@@ -21,8 +21,8 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="ff-league">
-        <NativeTabs.Trigger.Label>FF League</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="national-league">
+        <NativeTabs.Trigger.Label>National League</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={<NativeTabs.Trigger.VectorIcon family={Ionicons} name="earth-outline" />}
         />

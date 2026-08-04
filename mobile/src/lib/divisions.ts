@@ -455,7 +455,7 @@ export interface NationalStandings {
 }
 
 /**
- * The FF League: one national standing across every division, for the
+ * The National League: one standing across every division, for the
  * currently running season. Bragging rights only — no prize attaches to
  * it, unlike the divisional tables.
  *
