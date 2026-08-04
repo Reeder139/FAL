@@ -39,16 +39,18 @@ brand's visual consistency from silently drifting screen by screen.
 ## Every tab screen uses `<TabScreen>` — never rebuild the shell by hand
 
 [`mobile/src/components/tab-screen.tsx`](mobile/src/components/tab-screen.tsx) is the
-shared shell (background, safe area, and the "Your Current League Position" strip)
+shared shell (background, safe area, the "Your Current League Position" strip, and
+the "Real Anglers | Real Fish | Real Prizes" strapline beneath it)
 for every screen reachable from the bottom tab bar. **Any new screen under
 `(tabs)/` — whether a top-level tab or nested in its own stack (see
 `(tabs)/league/` for the pattern: a division drill-down page that still keeps the
 tab bar and Catch FAB visible) — wraps its content in `<TabScreen>` instead of
 reimplementing the outer `View`/`SafeAreaView` pair.** This is what makes "every
 page keeps both bars" a property of the template rather than something to
-remember per screen: change `TabScreen` (or `LeagueStrip`) once and every page
-picks it up. Screens outside the tabs entirely (auth, onboarding, `log-catch`'s
-modal) don't use it — there's no tab bar to keep visible there by construction.
+remember per screen: change `TabScreen` (or `LeagueStrip`, or `TagLine`) once and
+every page picks it up. Screens outside the tabs entirely (auth, onboarding,
+`log-catch`'s modal, the `join` placeholder) don't use it — there's no tab bar to
+keep visible there by construction, so they get no strip and no strapline either.
 
 ## Core model: two layers, deliberately separated
 

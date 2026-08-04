@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LeagueStripBar } from '@/components/league-strip-bar';
+import { TagLine } from '@/components/tag-line';
 import { useTheme } from '@/hooks/use-theme';
 
 type TabScreenProps = {
@@ -16,7 +17,8 @@ type TabScreenProps = {
 /**
  * Shared shell for every screen reachable from the bottom tab bar,
  * including nested drill-down screens like league/[id] — background, safe
- * area, and the "Your Current League Position" strip.
+ * area, the "Your Current League Position" strip, and the strapline beneath
+ * it.
  *
  * This is the enforcement point for "every page keeps the top and bottom
  * bars": any new screen under (tabs)/ (top-level or nested in its own
@@ -32,6 +34,7 @@ export function TabScreen({ children, centered }: TabScreenProps) {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <SafeAreaView style={[styles.safeArea, centered && styles.centered]}>
         <LeagueStripBar />
+        <TagLine />
         {children}
       </SafeAreaView>
     </View>
