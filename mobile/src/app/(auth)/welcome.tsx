@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import type { ImageSourcePropType, StyleProp, ViewStyle } from 'react-native';
-import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors, MaxContentWidth, Radii, Spacing } from '@/constants/theme';
@@ -63,10 +63,19 @@ export default function WelcomeScreen() {
   const router = useRouter();
 
   return (
-    <ImageBackground
-      source={require('@/assets/images/login/background.jpg')}
-      resizeMode="cover"
-      style={styles.background}>
+    <View style={styles.background}>
+      {/* Deliberately a plain absolutely-positioned Image rather than
+       * ImageBackground: on react-native-web, ImageBackground never passes
+       * resizeMode down to the inner <img>, which then falls back to the
+       * source's intrinsic 1080x1920 anchored top-left — so on a desktop
+       * viewport the scene covered only part of the width. Explicit
+       * 100%/100% plus resizeMode here fills and centre-crops on both
+       * platforms. */}
+      <Image
+        source={require('@/assets/images/login/background.jpg')}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      />
       {/* The art is already dark, but the crop shifts with viewport ratio —
        * this keeps contrast predictable behind the artwork regardless. */}
       <View style={styles.scrim} />
@@ -117,7 +126,7 @@ export default function WelcomeScreen() {
           />
         </ScrollView>
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -125,6 +134,15 @@ const styles = StyleSheet.create({
   background: {
     flex: 1,
     backgroundColor: Colors.dark.background,
+  },
+  backgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    // Explicit dimensions matter: without them react-native-web sizes the
+    // <img> from its intrinsic pixels instead of filling the container.
+    width: '100%',
+    height: '100%',
   },
   scrim: {
     position: 'absolute',
