@@ -175,7 +175,7 @@ Don't invent new division colors per screen — always pull `divisionOne` /
 | `MaxContentWidth` | 800 | Content column cap on wide/web viewports — every screen centers within this instead of stretching edge to edge |
 | `BottomTabInset` | 50 (iOS) / 80 (Android) / 0 (web) | Extra bottom padding on scrollable content so it clears the native tab bar |
 | `SuggestedFollowsRailHeight` | 146 | Feed's suggested-follows rail — fits a circular avatar plus name, division/position and the follow button (card height is `avatar + 64`, so 140px at the widest avatar) |
-| `LeagueStripBannerHeight` | `{ min: 28, max: 48 }` | Join banner in the League Position strip, clamped — see below |
+| `LeagueStripBannerHeight` | `{ min: 28, max: 60 }` | Join banner in the League Position strip, clamped — see below |
 | `LeagueStripTextMinWidth` | 208 | Width the strip reserves for its text column before sizing the banner |
 | `SearchIconSize` | 28 | Member-search icon on the feed, right-aligned on the tab pills' row |
 | `NavIconSize` | 42 | Bottom nav bar icons — bounded by tab width (~62px at 360), not height |
@@ -269,9 +269,15 @@ resulting height to `LeagueStripBannerHeight`. Measured result:
 | Viewport | Strip | Banner | Space above/below |
 |---|---|---|---|
 | 360 | 44 | 104×28 | 8 |
-| 375 | 44 | 119×32 | 6 |
-| 430 | 57 | 174×47 | 5 |
-| ≥800 | 58 | 178×48 | 5 |
+| 390 | 45 | 133×36 | 5 |
+| ≥478 | 69 | 222×60 | 5 |
+
+The banner is always vertically centred in the strip, and the strip hugs it:
+past the point where the text column stops being the tallest thing in the row,
+strip height is just the banner plus the container's padding. So "fill the
+strip better" means a bigger banner and a deeper strip together — they can't
+move independently. The `max` is the lever, and it only bites above ~478px
+wide; phones sit below it and are sized by the width left over instead.
 
 **Don't size this from the strip's own height** (`alignSelf: 'stretch'` plus
 `aspectRatio`), which looks like the obvious way to make it fill. That's a
