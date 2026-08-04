@@ -177,6 +177,7 @@ Don't invent new division colors per screen — always pull `divisionOne` /
 | `SuggestedFollowsRailHeight` | 164 | Feed's suggested-follows rail — fits a circular avatar plus name, division/position, best fish and the follow button (~147px of content) |
 | `LeagueStripBannerHeight` | `{ min: 28, max: 48 }` | Join banner in the League Position strip, clamped — see below |
 | `LeagueStripTextMinWidth` | 208 | Width the strip reserves for its text column before sizing the banner |
+| `SearchIconSize` | 28 | Member-search icon on the feed, right-aligned on the tab pills' row |
 
 ### The League Position strip's join banner
 

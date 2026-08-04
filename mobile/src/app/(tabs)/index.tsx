@@ -1,12 +1,20 @@
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FeedTabs } from '@/components/feed-tabs';
 import { PostCard } from '@/components/post-card';
 import { SuggestedAnglersList } from '@/components/suggested-anglers';
 import { SuggestedFollowsRail } from '@/components/suggested-follows-rail';
 import { TabScreen } from '@/components/tab-screen';
-import { BottomTabInset, ButtonVariants, MaxContentWidth, Spacing, Typography } from '@/constants/theme';
+import {
+  BottomTabInset,
+  ButtonVariants,
+  MaxContentWidth,
+  SearchIconSize,
+  Spacing,
+  Typography,
+} from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchFeedPage, type FeedItemWithPhoto, type FeedTab } from '@/lib/feed';
 import { getLastFeedTab, setLastFeedTab } from '@/lib/feedTabPreference';
@@ -15,6 +23,7 @@ import { useAuth } from '@/providers/auth-provider';
 
 export default function HomeScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const { session } = useAuth();
   const [tab, setTab] = useState<FeedTab | null>(null);
   const [showLeagueTab, setShowLeagueTab] = useState(false);
@@ -89,6 +98,18 @@ export default function HomeScreen() {
       {tab && (
         <View style={styles.tabsWrapper}>
           <FeedTabs value={tab} onChange={handleTabChange} showLeagueTab={showLeagueTab} />
+          {/* Right-aligned on the tabs' own row: the tab pills size to their
+           * labels, so the spacer between them and the icon is what pins the
+           * icon to the edge rather than a fixed width that would drift as
+           * My League comes and goes. */}
+          <View style={styles.headerSpacer} />
+          <Pressable
+            onPress={() => router.push('/search-anglers')}
+            accessibilityRole="button"
+            accessibilityLabel="Find members"
+            hitSlop={Spacing.two}>
+            <Image source={require('@/assets/images/search-icon.png')} style={styles.searchIcon} />
+          </Pressable>
         </View>
       )}
 
@@ -149,8 +170,17 @@ const styles = StyleSheet.create({
   tabsWrapper: {
     width: '100%',
     maxWidth: MaxContentWidth,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
+  },
+  headerSpacer: {
+    flex: 1,
+  },
+  searchIcon: {
+    width: SearchIconSize,
+    height: SearchIconSize,
   },
   loading: {
     marginTop: Spacing.six,

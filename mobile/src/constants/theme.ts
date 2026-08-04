@@ -403,3 +403,7 @@ export const LeagueStripBannerHeight = { min: 28, max: 48 } as const;
  * beneath it 194px at `Typography.bodySmall` — so this is the label's
  * width plus a little slack. Below this the label wraps to two lines. */
 export const LeagueStripTextMinWidth = 208;
+/** Member-search icon on the feed, sitting on the tab pills' row. Matched to
+ * the pills' height (bodySmall on ButtonVariants' tab padding) so the row
+ * reads as one band rather than the icon setting its own height. */
+export const SearchIconSize = 28;

@@ -18,6 +18,8 @@
 
 create extension if not exists "uuid-ossp";
 create extension if not exists citext;
+-- Trigram matching, behind search_anglers() — see section 11.
+create extension if not exists pg_trgm with schema extensions;
 
 -- Not exposed via the Data API. Anything in here is invisible to the app.
 create schema if not exists private;
@@ -52,6 +54,14 @@ create table profiles (
 
 comment on column profiles.pb_verified is
   'Anti-sandbagging: unverified PBs seed into Division 1. Proving a LOW pb is what buys an easier division.';
+
+-- Trigram indexes behind search_anglers() (section 11). These serve both the
+-- `%` similarity operator and the leading-wildcard ilike patterns that
+-- search uses — a btree can do neither.
+create index if not exists profiles_username_trgm_idx
+  on public.profiles using gin ((username::text) extensions.gin_trgm_ops);
+create index if not exists profiles_display_name_trgm_idx
+  on public.profiles using gin (display_name extensions.gin_trgm_ops);
 
 -- Helper used by policies. security definer so it can read profiles without
 -- tripping the profiles policies and causing infinite recursion.
@@ -1516,3 +1526,103 @@ begin
     true;
 end;
 $$;
+
+
+-- ============================================================================
+-- 11. MEMBER SEARCH
+-- ============================================================================
+
+-- Ranked member search behind the feed's search dialog.
+--
+-- Ranked, not merely filtered: results must be "nearest possible" to what
+-- was typed, which plain ilike cannot do — '%reder%' misses "reeder139"
+-- outright, so one dropped letter returns nothing. This scores every
+-- candidate and orders by the score.
+--
+-- Two mechanisms, taken as the greater of the two, each covering the
+-- other's blind spot:
+--   * An exact / prefix / substring ladder — someone typing the first three
+--     letters of a username expects that person first, and raw trigram
+--     similarity ranks a short query against a long name poorly.
+--   * Trigram similarity — the only half that absorbs typos.
+--
+-- Candidates are narrowed by an indexable predicate first (see the trigram
+-- indexes on profiles), so this doesn't seq-scan as membership grows.
+create or replace function public.search_anglers(p_query text, p_limit integer default 20)
+returns table (
+  id           uuid,
+  username     citext,
+  display_name text,
+  avatar_path  text,
+  is_following boolean,
+  match_score  real
+)
+language sql
+stable
+-- SECURITY INVOKER (the default, stated because it matters): profiles RLS
+-- still applies, so this exposes nothing the client couldn't select itself.
+security invoker
+set search_path = public, extensions
+as $$
+  with needle as (
+    select
+      lower(btrim(p_query)) as q,
+      -- LIKE metacharacters escaped: someone typing "100%" searches for
+      -- that text rather than globbing every profile.
+      replace(replace(replace(btrim(p_query), '\', '\'), '%', '\%'), '_', '\_') as q_like
+  ),
+  candidates as (
+    select p.id, p.username, p.display_name, p.avatar_path, n.q
+    from public.profiles p
+    cross join needle n
+    where n.q <> ''
+      and p.id is distinct from auth.uid()
+      and (
+        p.username::text ilike '%' || n.q_like || '%'
+        or coalesce(p.display_name, '') ilike '%' || n.q_like || '%'
+        or p.username::text % n.q
+        or coalesce(p.display_name, '') % n.q
+      )
+  ),
+  scored as (
+    select
+      c.id,
+      c.username,
+      c.display_name,
+      c.avatar_path,
+      greatest(
+        case
+          when lower(c.username::text) = c.q or lower(coalesce(c.display_name, '')) = c.q then 1.0
+          when lower(c.username::text) like c.q || '%'
+            or lower(coalesce(c.display_name, '')) like c.q || '%' then 0.9
+          when lower(c.username::text) like '%' || c.q || '%'
+            or lower(coalesce(c.display_name, '')) like '%' || c.q || '%' then 0.8
+          else 0.0
+        end::real,
+        similarity(lower(c.username::text), c.q),
+        similarity(lower(coalesce(c.display_name, '')), c.q)
+      ) as match_score
+    from candidates c
+  )
+  select
+    s.id,
+    s.username,
+    s.display_name,
+    s.avatar_path,
+    exists (
+      select 1
+      from public.follows f
+      where f.follower_id = auth.uid()
+        and f.followee_id = s.id
+    ) as is_following,
+    s.match_score
+  from scored s
+  where s.match_score > 0
+  order by s.match_score desc, s.username asc
+  limit least(greatest(coalesce(p_limit, 20), 1), 50);
+$$;
+
+comment on function public.search_anglers(text, integer) is
+  'Fuzzy member search for the feed search dialog. Ranks by the greater of an exact/prefix/substring ladder and trigram similarity, so partial names and typos both resolve to the intended angler. Excludes the caller. SECURITY INVOKER — profiles RLS still applies.';
+
+grant execute on function public.search_anglers(text, integer) to authenticated;

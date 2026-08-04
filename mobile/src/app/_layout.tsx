@@ -24,6 +24,9 @@ export default function RootLayout() {
            * tab's own stack instead (see (tabs)/league/_layout.tsx) so the
            * tab bar and Catch FAB stay visible everywhere else. */}
           <Stack.Screen name="log-catch" options={{ presentation: 'modal' }} />
+          {/* Same reasoning as log-catch: a focused single-task flow you
+            * finish and dismiss, not a page you browse. */}
+          <Stack.Screen name="search-anglers" options={{ presentation: 'modal' }} />
         </Stack>
       </AuthProvider>
     </ThemeProvider>
