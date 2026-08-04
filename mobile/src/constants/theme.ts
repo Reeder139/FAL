@@ -382,3 +382,24 @@ export const MaxContentWidth = 800;
  * measures ~147px, so this leaves a little headroom for larger system
  * font settings without opening a visible gap under the row. */
 export const SuggestedFollowsRailHeight = 164;
+/** Join banner in the League Position strip, as a height range rather than
+ * a width. Height is the meaningful dimension: the banner is the tallest
+ * thing in the row, so it sets the strip's depth and the strip hugs it —
+ * which is what makes the artwork read as filling the strip instead of
+ * floating in it. Width follows from the artwork's fixed 3.7:1 ratio.
+ *
+ * A range, not one value, because the banner shares its row with the
+ * standings. At 3.7:1 height buys width fast, and every pixel of width the
+ * banner takes comes off the text column; once the text no longer fits on
+ * one line it wraps, and the wrap deepens the strip by more than the taller
+ * banner gained. So the strip gives the text its one-line width first (see
+ * LeagueStripTextMinWidth) and sizes the banner from what's left, clamped
+ * here — `min` keeps it legible on a 360px phone, `max` stops it dominating
+ * the 800px content column on desktop. */
+export const LeagueStripBannerHeight = { min: 28, max: 48 } as const;
+/** Width the League Position strip reserves for its text column before
+ * sizing the join banner. Measured: the "Your Current League Position"
+ * label needs 205px on one line at `Typography.label`, and the standings
+ * beneath it 194px at `Typography.bodySmall` — so this is the label's
+ * width plus a little slack. Below this the label wraps to two lines. */
+export const LeagueStripTextMinWidth = 208;

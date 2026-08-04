@@ -1,7 +1,14 @@
 import { useRouter } from 'expo-router';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
-import { Radii, Spacing, Typography } from '@/constants/theme';
+import {
+  LeagueStripBannerHeight,
+  LeagueStripTextMinWidth,
+  MaxContentWidth,
+  Radii,
+  Spacing,
+  Typography,
+} from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { LeagueSummary } from '@/lib/leagueSummary';
 import { ordinal } from '@/lib/units';
@@ -9,10 +16,6 @@ import { ordinal } from '@/lib/units';
 /** Source dimensions of the prepared banner (see
  * scripts/prepare-join-banner.mjs). */
 const JOIN_BANNER_RATIO = 700 / 189;
-/** Ceiling on the banner's width. At phone width the column share already
- * lands under this, so it only bites on wider viewports — where the banner
- * would otherwise keep growing with the 800px content column. */
-const JOIN_BANNER_MAX_WIDTH = 180;
 
 // TODO: real trend delta once we have standings history to diff against —
 // hardcoded placeholder for now, per the design ask.
@@ -48,10 +51,33 @@ type LeagueStripProps = {
 export function LeagueStrip({ summary }: LeagueStripProps) {
   const theme = useTheme();
   const router = useRouter();
+  const { width: windowWidth } = useWindowDimensions();
 
   // No running season means there's nothing to join yet, so the prompt
   // would be misleading rather than useful.
   const showJoinPrompt = !summary.isPaidMember && summary.kind !== 'no_active_season';
+
+  // Reserve the text its one-line width, give the rest of the row to the
+  // banner, and let the ratio turn that into a height. Sizing this way — a
+  // definite height the banner owns — is what makes it the tallest item in
+  // the row, so the strip hugs the banner instead of the banner floating in
+  // a strip the text made deeper than it.
+  //
+  // Deliberately not sized from the strip's own height (`alignSelf:
+  // 'stretch'` + `aspectRatio`), which reads as the obvious way to fill it:
+  // that is a cyclic size dependency — the strip's height depends on its
+  // children and the banner's width depends on the strip's height — and the
+  // browser breaks the cycle by laying the strip out as if the text had
+  // never wrapped, leaving the standings overflowing the border by 16px at
+  // 360px wide.
+  const spareWidth =
+    Math.min(windowWidth, MaxContentWidth) -
+    Spacing.three * 2 - // the container's own horizontal padding
+    Spacing.three - // the gap between the text and the banner
+    LeagueStripTextMinWidth;
+  const bannerHeight = Math.round(
+    Math.min(Math.max(spareWidth / JOIN_BANNER_RATIO, LeagueStripBannerHeight.min), LeagueStripBannerHeight.max)
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}>
@@ -73,18 +99,16 @@ export function LeagueStrip({ summary }: LeagueStripProps) {
           onPress={() => router.push('/join')}
           accessibilityRole="button"
           accessibilityLabel="Join the League to win the £20,000 grand prize"
-          style={styles.joinRow}
+          style={[styles.joinRow, { height: bannerHeight, width: bannerHeight * JOIN_BANNER_RATIO }]}
           hitSlop={Spacing.one}>
-          {/* The ratio sits on a wrapper View, not the Image: on
-           * react-native-web an Image gets an inline height from its
-           * intrinsic pixel size, which overrides aspectRatio. */}
-          <View style={styles.joinBannerBox}>
-            <Image
-              source={require('@/assets/images/join-league-banner.png')}
-              style={styles.joinBanner}
-              resizeMode="contain"
-            />
-          </View>
+          {/* Both dimensions are given explicitly rather than leaning on
+           * aspectRatio: on react-native-web an Image picks up an inline
+           * height from its intrinsic pixel size, which overrides a ratio. */}
+          <Image
+            source={require('@/assets/images/join-league-banner.png')}
+            style={styles.joinBanner}
+            resizeMode="contain"
+          />
         </Pressable>
       )}
     </View>
@@ -109,33 +133,21 @@ const styles = StyleSheet.create({
     borderRadius: Radii.xs,
   },
   textGroup: {
-    // The larger share, sized so the label and the standings each fit on
-    // one line. That's what keeps the strip shallow: at an even split both
-    // wrapped to two lines and the text column, not the banner, was
-    // setting the strip's height.
-    flex: 1.6,
+    // Takes whatever the banner leaves. Keeping the label and the standings
+    // each on one line is what keeps the strip shallow — a wrap there makes
+    // the text column, not the banner, set the strip's height, and the
+    // banner then floats in a strip deeper than itself.
+    flex: 1,
   },
   summaryLine: {
     marginTop: Spacing.half,
   },
   joinRow: {
-    // Takes the leftover width. The container's own `gap` is what
-    // separates it from the standings.
-    flex: 1,
-    // Capped, or the banner scales with the column: at the 800px content
-    // width it reached 288x78 and pushed the strip to 96px deep, leaving
-    // the standings floating in the middle of it. Past phone width the
-    // banner should stay put rather than grow.
-    maxWidth: JOIN_BANNER_MAX_WIDTH,
-    // Guards the aspect ratio: if a parent ever stretched this item, the
-    // box's height would be set by the stretch rather than by aspectRatio
-    // and the artwork would squash. Centring keeps height content-driven.
-    alignSelf: 'center',
-  },
-  joinBannerBox: {
-    width: '100%',
-    // Matches the prepared asset (700x189) so it never distorts.
-    aspectRatio: JOIN_BANNER_RATIO,
+    // Width and height come from the render — see bannerHeight there. This
+    // item must not flex: its size is the whole point, and letting the row
+    // shrink it would break the ratio.
+    flexGrow: 0,
+    flexShrink: 0,
   },
   joinBanner: {
     width: '100%',

@@ -175,3 +175,35 @@ Don't invent new division colors per screen — always pull `divisionOne` /
 | `MaxContentWidth` | 800 | Content column cap on wide/web viewports — every screen centers within this instead of stretching edge to edge |
 | `BottomTabInset` | 50 (iOS) / 80 (Android) / 0 (web) | Extra bottom padding on scrollable content so it clears the native tab bar |
 | `SuggestedFollowsRailHeight` | 164 | Feed's suggested-follows rail — fits a circular avatar plus name, division/position, best fish and the follow button (~147px of content) |
+| `LeagueStripBannerHeight` | `{ min: 28, max: 48 }` | Join banner in the League Position strip, clamped — see below |
+| `LeagueStripTextMinWidth` | 208 | Width the strip reserves for its text column before sizing the banner |
+
+### The League Position strip's join banner
+
+The banner is sized by **height**, not width, and the width follows from the
+artwork's fixed 3.7:1 ratio. That ordering is the whole design: the banner is
+the tallest thing in the row, so it sets the strip's depth and the strip hugs
+it — which is what makes the artwork read as *filling* the strip rather than
+floating in it.
+
+It can't simply take a share of the row, though, because it shares that row
+with the standings. At 3.7:1, height buys width fast, and every pixel of width
+the banner takes comes off the text column; once "Your Current League Position"
+no longer fits on one line it wraps, and the wrap deepens the strip by more
+than the taller banner gained. So the strip reserves `LeagueStripTextMinWidth`
+for the text first, gives the leftover width to the banner, and clamps the
+resulting height to `LeagueStripBannerHeight`. Measured result:
+
+| Viewport | Strip | Banner | Space above/below |
+|---|---|---|---|
+| 360 | 44 | 104×28 | 8 |
+| 375 | 44 | 119×32 | 6 |
+| 430 | 57 | 174×47 | 5 |
+| ≥800 | 58 | 178×48 | 5 |
+
+**Don't size this from the strip's own height** (`alignSelf: 'stretch'` plus
+`aspectRatio`), which looks like the obvious way to make it fill. That's a
+cyclic size dependency — the strip's height depends on its children, the
+banner's width depends on the strip's height — and the browser breaks the cycle
+by laying the strip out as if the text had never wrapped, which left the
+standings overflowing the strip's border by 16px at 360.
