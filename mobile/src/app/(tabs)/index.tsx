@@ -99,36 +99,41 @@ export default function HomeScreen() {
       <SuggestedFollowsRail />
 
       {tab && (
-        <View style={styles.tabsWrapper}>
-          <FeedTabs value={tab} onChange={handleTabChange} showLeagueTab={showLeagueTab} />
-          {/* Rules sits centred in the space the pills leave, between them
-           * and the search icon — a spacer either side rather than absolute
-           * centring on the row.
-           *
-           * True row-centre isn't available: the pills run to x275 on a 390px
-           * phone with My League showing, and the row's midpoint is x195, so
-           * an icon centred on the row lands on top of that pill and takes
-           * its taps. Equal spacers put it in the middle of the gap, which is
-           * where "between the tabs and search" actually reads, and it can
-           * never collide however the pills resize. */}
-          <View style={styles.headerSpacer} />
-          <Pressable
-            onPress={showRules}
-            accessibilityRole="button"
-            accessibilityLabel="The rules of the game"
-            hitSlop={Spacing.two}>
-            <Image source={require('@/assets/images/rules-icon.png')} style={styles.rulesIcon} />
-          </Pressable>
-          <View style={styles.headerSpacer} />
+        <>
+          <View style={styles.tabsWrapper}>
+            <FeedTabs value={tab} onChange={handleTabChange} showLeagueTab={showLeagueTab} />
+          </View>
 
-          <Pressable
-            onPress={() => router.push('/search-anglers')}
-            accessibilityRole="button"
-            accessibilityLabel="Find members"
-            hitSlop={Spacing.two}>
-            <Image source={require('@/assets/images/search-icon.png')} style={styles.searchIcon} />
-          </Pressable>
-        </View>
+          {/* The icons get their own line so rules can sit on the true centre.
+           * Sharing the tabs' row made that impossible: three pills run to
+           * x275 of a 390px screen whose midpoint is x195, so a centred icon
+           * landed on the My League pill and took its taps. Squeezing the
+           * pills clear of the middle would need ~40% off their labels.
+           *
+           * Rules is centred by absolute positioning rather than by spacers —
+           * search is the only other child, so spacers would centre rules in
+           * the space search leaves rather than on the row itself. */}
+          <View style={styles.iconRow}>
+            <View style={styles.iconRowCentre} pointerEvents="box-none">
+              <Pressable
+                onPress={showRules}
+                accessibilityRole="button"
+                accessibilityLabel="The rules of the game"
+                hitSlop={Spacing.two}>
+                <Image source={require('@/assets/images/rules-icon.png')} style={styles.rulesIcon} />
+              </Pressable>
+            </View>
+
+            <View style={styles.headerSpacer} />
+            <Pressable
+              onPress={() => router.push('/search-anglers')}
+              accessibilityRole="button"
+              accessibilityLabel="Find members"
+              hitSlop={Spacing.two}>
+              <Image source={require('@/assets/images/search-icon.png')} style={styles.searchIcon} />
+            </Pressable>
+          </View>
+        </>
       )}
 
       {loading || !tab ? (
@@ -192,6 +197,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
+  },
+  iconRow: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.two,
+  },
+  /** Spans the row so its child lands on the row's own centre, independent of
+   * what else is on the line. box-none so it only takes taps on the icon
+   * itself and the empty space either side stays inert. */
+  iconRowCentre: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: Spacing.two,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerSpacer: {
     flex: 1,
