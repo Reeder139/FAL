@@ -41,11 +41,14 @@ import path from 'node:path';
 
 import sharp from 'sharp';
 
-const SRC = path.resolve('..', 'Images', 'Login page assets', 'Carp Leagues Logo.png');
+const SRC = path.resolve('..', 'Images', 'Login page assets', 'Carp Leagues Logo 2.png');
 const OUT = path.resolve('assets', 'images', 'login', 'carp-leagues-logo.png');
 
 /** Luminance at or below this is certainly backdrop — fully cleared.
- * Measured: the outer frame runs 0-2 with no tail. */
+ * Measured: the outer frame is pure black at the median. It does have a
+ * bright tail (p99 ~11, max ~252) but that is the gold spray, whose
+ * droplets scatter right out to the edge — islands the fill goes around
+ * and keeps, not backdrop it should be clearing. */
 const CLEAR_BELOW = 2;
 /** Luminance at or above this is certainly artwork — the flood stops here.
  * Between the two, alpha ramps. Kept just above the backdrop's ceiling
