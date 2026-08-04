@@ -10,9 +10,16 @@ import { formatWeightOz, ordinal } from '@/lib/units';
 
 const DIVISION_COLOR_KEYS = ['divisionOne', 'divisionTwo', 'divisionThree'] as const;
 
-// 5 full cards visible + the 6th peeking, so it reads as scrollable at a
-// glance rather than looking like a complete, fixed row.
-const VISIBLE_CARDS = 5.5;
+// 4 full circles visible + a half one peeking, so it still reads as
+// scrollable at a glance rather than looking like a complete, fixed row.
+const VISIBLE_CARDS = 4.5;
+const GAP = Spacing.three;
+/** Ceiling on the column width, and so on the circle's diameter. Without
+ * it a wide viewport divides its 800px column by 4.5 and produces a 156px
+ * circle, which overflows the fixed rail height and squashes the text
+ * beneath it to nothing. Past phone width the rail should show more
+ * circles, not bigger ones. */
+const MAX_CARD_WIDTH = 76;
 
 function Card({ card, onDismiss }: { card: SuggestedFollowCard; onDismiss: (id: string) => void }) {
   const theme = useTheme();
@@ -20,21 +27,28 @@ function Card({ card, onDismiss }: { card: SuggestedFollowCard; onDismiss: (id: 
     card.divisionRank !== null ? theme[DIVISION_COLOR_KEYS[(card.divisionRank - 1) % 3]] : theme.primary;
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-      <Pressable
-        onPress={() => onDismiss(card.id)}
-        hitSlop={Spacing.two}
-        style={[styles.dismissButton, { backgroundColor: theme.surfaceElevated }]}>
-        <Ionicons name="close" size={12} color={theme.textMuted} />
-      </Pressable>
+    <View style={styles.card}>
+      {/* The avatar is the item now — no card chrome behind it, so the
+       * circles read as a row of faces rather than a row of tiles. */}
+      <View style={styles.avatarWrap}>
+        {card.avatarUrl ? (
+          <Image source={{ uri: card.avatarUrl }} style={[styles.avatar, { borderColor: theme.border }]} />
+        ) : (
+          <View
+            style={[styles.avatar, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}
+          />
+        )}
+        <Pressable
+          onPress={() => onDismiss(card.id)}
+          accessibilityRole="button"
+          accessibilityLabel={`Dismiss ${card.username}`}
+          hitSlop={Spacing.two}
+          style={[styles.dismissButton, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}>
+          <Ionicons name="close" size={11} color={theme.textMuted} />
+        </Pressable>
+      </View>
 
-      {card.avatarUrl ? (
-        <Image source={{ uri: card.avatarUrl }} style={styles.avatar} />
-      ) : (
-        <View style={[styles.avatar, { backgroundColor: theme.surfaceElevated }]} />
-      )}
-
-      <Text style={[Typography.caption, { color: theme.text, fontWeight: '700' }]} numberOfLines={1}>
+      <Text style={[Typography.caption, styles.username, { color: theme.text }]} numberOfLines={1}>
         {card.username}
       </Text>
 
@@ -78,7 +92,10 @@ export function SuggestedFollowsRail() {
   if (!cards || cards.length === 0) return null;
 
   const containerWidth = Math.min(windowWidth, MaxContentWidth) - Spacing.three * 2;
-  const cardWidth = (containerWidth - Spacing.two * Math.floor(VISIBLE_CARDS)) / VISIBLE_CARDS;
+  const cardWidth = Math.min(
+    (containerWidth - GAP * Math.floor(VISIBLE_CARDS)) / VISIBLE_CARDS,
+    MAX_CARD_WIDTH
+  );
 
   return (
     <View style={styles.wrapper}>
@@ -111,31 +128,38 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   scrollContent: {
-    gap: Spacing.two,
+    gap: GAP,
   },
   card: {
     flex: 1,
-    borderWidth: 1,
-    borderRadius: Radii.md,
-    padding: Spacing.two,
     alignItems: 'center',
-    justifyContent: 'center',
     gap: Spacing.half,
+  },
+  // Square box that the circle fills, so the avatar scales with the column
+  // width rather than being a fixed size.
+  avatarWrap: {
+    width: '100%',
+    aspectRatio: 1,
+    marginBottom: Spacing.half,
+  },
+  avatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: Radii.circle,
+    borderWidth: 1,
   },
   dismissButton: {
     position: 'absolute',
-    top: Spacing.one,
-    right: Spacing.one,
+    top: 0,
+    right: 0,
     width: 18,
     height: 18,
     borderRadius: Radii.circle,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatar: {
-    width: Spacing.five,
-    height: Spacing.five,
-    borderRadius: Radii.circle,
-    marginBottom: Spacing.half,
+  username: {
+    fontWeight: '700',
   },
 });

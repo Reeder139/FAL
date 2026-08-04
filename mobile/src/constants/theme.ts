@@ -376,6 +376,9 @@ export const InputStyle = {
 // ---------------------------------------------------------------------------
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
-/** Suggested-follows rail on the feed — roughly 3x the League Position
- * strip's own height (~52px: two text lines + vertical padding). */
-export const SuggestedFollowsRailHeight = 156;
+/** Suggested-follows rail on the feed. Sized to fit a circular avatar
+ * (one column wide, ~65px at phone width) plus the name, division and
+ * best-fish lines and the follow button beneath it — that content
+ * measures ~147px, so this leaves a little headroom for larger system
+ * font settings without opening a visible gap under the row. */
+export const SuggestedFollowsRailHeight = 164;

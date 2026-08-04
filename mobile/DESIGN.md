@@ -174,4 +174,4 @@ Don't invent new division colors per screen — always pull `divisionOne` /
 |---|---|---|
 | `MaxContentWidth` | 800 | Content column cap on wide/web viewports — every screen centers within this instead of stretching edge to edge |
 | `BottomTabInset` | 50 (iOS) / 80 (Android) / 0 (web) | Extra bottom padding on scrollable content so it clears the native tab bar |
-| `SuggestedFollowsRailHeight` | 156 | Feed's suggested-follows rail — roughly 3x the League Position strip's own height |
+| `SuggestedFollowsRailHeight` | 164 | Feed's suggested-follows rail — fits a circular avatar plus name, division/position, best fish and the follow button (~147px of content) |
