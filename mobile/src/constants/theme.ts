@@ -410,9 +410,15 @@ export const LeagueStripTextMinWidth = 208;
  * the pills' height (bodySmall on ButtonVariants' tab padding) so the row
  * reads as one band rather than the icon setting its own height. */
 export const SearchIconSize = 28;
-/** Bottom nav bar icons. Bounded by width, not height: five tabs plus the
- * raised Catch button leave ~56px per tab at phone width, and the icon needs
- * to sit inside that with padding either side. These replaced the text
- * labels, so the icon is the whole target — there's no caption under it to
- * share the height with. */
-export const NavIconSize = 32;
+/** Bottom nav bar icons. Bounded by width, not height — and specifically by
+ * the narrowest tab, not the average one. The bar splits into two equal
+ * halves either side of the Catch button (it has to; see app-tabs.web.tsx),
+ * and the right half divides its width three ways against the left's two.
+ * That gives ~41px per right-hand tab on a 360px phone, which is what caps
+ * this: at 40 the three right icons ended up 1.3px apart.
+ *
+ * These replaced the text labels, so the icon is the whole target — there's
+ * no caption beneath it to share the height with, which is why it can run
+ * this large at all. The bar's depth follows from it: raising this deepens
+ * the bar by the same amount. */
+export const NavIconSize = 36;

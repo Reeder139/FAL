@@ -178,7 +178,7 @@ Don't invent new division colors per screen — always pull `divisionOne` /
 | `LeagueStripBannerHeight` | `{ min: 28, max: 48 }` | Join banner in the League Position strip, clamped — see below |
 | `LeagueStripTextMinWidth` | 208 | Width the strip reserves for its text column before sizing the banner |
 | `SearchIconSize` | 28 | Member-search icon on the feed, right-aligned on the tab pills' row |
-| `NavIconSize` | 32 | Bottom nav bar icons — bounded by tab width (~56px each), not height |
+| `NavIconSize` | 36 | Bottom nav bar icons — bounded by the narrowest tab (~41px at 360), not height |
 
 ### Bottom nav bar
 
@@ -204,9 +204,21 @@ and full opacity against 0.65 for the rest. The icons are full-colour gold,
 so a "muted" color token would fight the artwork — opacity is what dims them
 without recolouring.
 
-Bar depth is 64px of visible bar inside a 96px footprint (the outer
+Bar depth is 68px of visible bar inside a 100px footprint (the outer
 `Spacing.three` padding sits either side of it), up from 50/82 when the bar
-held two-line text labels.
+held two-line text labels. Depth is derived, not chosen: it's the icon plus
+the button and container padding, so `NavIconSize` is the only number to
+change if the bar should be deeper or shallower.
+
+**What caps the icon size.** The bar splits into two equal halves either side
+of the Catch button, and the left half holds 2 tabs against the right's 3 —
+so right-hand tabs are a third narrower, and they're what the icon has to fit.
+That split has to stay even: the FAB is centred on the viewport, so the gap
+between the groups is only centred when both groups are the same width.
+Weighting each group by its tab count equalises tab widths but slides the gap
+left, and the FAB then sits over the Divisions icon. At 360px this leaves
+~41px per right-hand tab, giving 5.3px between icons at 36 — and 1.3px at 40,
+which is why 40 was backed out.
 
 ### The League Position strip's join banner
 

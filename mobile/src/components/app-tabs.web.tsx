@@ -87,6 +87,16 @@ export function CustomTabList(props: TabListProps) {
   return (
     <View {...props} style={styles.tabListContainer}>
       <ThemedView type="backgroundElement" style={styles.innerContainer}>
+        {/* The two groups flex evenly even though the left holds 2 tabs and
+         * the right 3, so right-hand tabs come out narrower. That asymmetry
+         * is load-bearing: the Catch FAB is centred on the viewport, so the
+         * gap between the groups has to be centred too, and it only is when
+         * both groups are the same width. Weighting each group by its tab
+         * count equalises tab widths but slides the gap left, and the FAB
+         * then sits over the Divisions icon.
+         *
+         * The right group's 3-way split is therefore what bounds NavIconSize
+         * — see the note on that token. */}
         <View style={styles.tabGroup}>{triggers.slice(0, LEFT_TAB_COUNT)}</View>
         <View style={{ width: FAB_CLEARANCE }} />
         <View style={styles.tabGroup}>{triggers.slice(LEFT_TAB_COUNT)}</View>
