@@ -22,7 +22,9 @@ import { Colors, MaxContentWidth, Radii, Spacing } from '@/constants/theme';
  */
 
 // Source aspect ratios, so nothing distorts as the column width changes.
-const LOGO_RATIO = 1; // 2048x2048
+// The Carp Leagues shield, prepared square (see
+// scripts/prepare-carp-leagues-logo.mjs).
+const LOGO_RATIO = 1; // 512x512
 const PRIZE_BOX_RATIO = 2400 / 1400;
 const BUTTON_RATIO = 2400 / 600;
 const BOTTOM_RAIL_RATIO = 2400 / 900;
@@ -89,9 +91,9 @@ export default function WelcomeScreen() {
           showsVerticalScrollIndicator={false}
           bounces={false}>
           <Art
-            source={require('@/assets/images/login/logo.png')}
+            source={require('@/assets/images/login/carp-leagues-logo.png')}
             ratio={LOGO_RATIO}
-            label="Fantasy Fishing"
+            label="Carp Leagues"
             style={styles.logo}
           />
 
