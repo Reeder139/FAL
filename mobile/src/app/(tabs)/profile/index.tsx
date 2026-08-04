@@ -1,9 +1,10 @@
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { CatchGrid } from '@/components/catch-grid';
 import { ProfileHeader } from '@/components/profile-header';
 import { TabScreen } from '@/components/tab-screen';
-import { BottomTabInset, ButtonVariants, MaxContentWidth, Spacing, Typography } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { getPublicStorageUrl } from '@/lib/storage';
 import { useAuth } from '@/providers/auth-provider';
@@ -17,6 +18,28 @@ export default function ProfileScreen() {
   return (
     <TabScreen>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Top-right rather than below the content: at the bottom it sat
+         * under the tab bar once the catch grid pushed the page past the
+         * viewport. */}
+        <View style={styles.topRow}>
+          <Pressable
+            onPress={signOut}
+            accessibilityRole="button"
+            accessibilityLabel="Log out"
+            // The pill is deliberately compact so it doesn't compete with
+            // the profile itself; hitSlop brings the tap target back up to
+            // a comfortable size without making it look heavier.
+            hitSlop={Spacing.three}
+            style={({ pressed }) => [
+              styles.logoutButton,
+              { borderColor: theme.danger },
+              pressed && styles.pressed,
+            ]}>
+            <Ionicons name="log-out-outline" size={14} color={theme.danger} />
+            <Text style={[Typography.caption, styles.logoutLabel, { color: theme.danger }]}>Log out</Text>
+          </Pressable>
+        </View>
+
         {profile && (
           <>
             <ProfileHeader
@@ -34,22 +57,6 @@ export default function ProfileScreen() {
             <CatchGrid anglerId={profile.id} />
           </>
         )}
-
-        <Pressable
-          onPress={signOut}
-          style={[
-            styles.logoutButton,
-            {
-              backgroundColor: ButtonVariants.outline.backgroundColor,
-              borderColor: theme.danger,
-              borderWidth: ButtonVariants.outline.borderWidth,
-              borderRadius: ButtonVariants.outline.borderRadius,
-              paddingVertical: ButtonVariants.outline.paddingVertical,
-              paddingHorizontal: ButtonVariants.outline.paddingHorizontal,
-            },
-          ]}>
-          <Text style={[Typography.button, { color: theme.danger }]}>Log out</Text>
-        </Pressable>
       </ScrollView>
     </TabScreen>
   );
@@ -61,13 +68,28 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     alignItems: 'center',
-    paddingTop: Spacing.four,
+    paddingTop: Spacing.two,
     paddingHorizontal: Spacing.four,
     paddingBottom: BottomTabInset + Spacing.four,
     gap: Spacing.two,
   },
+  topRow: {
+    alignSelf: 'stretch',
+    alignItems: 'flex-end',
+  },
   logoutButton: {
-    marginTop: Spacing.five,
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.one,
+    borderWidth: 1,
+    borderRadius: Radii.pill,
+    paddingVertical: Spacing.half,
+    paddingHorizontal: Spacing.two,
+  },
+  logoutLabel: {
+    fontWeight: '700',
+  },
+  pressed: {
+    opacity: 0.7,
   },
 });
