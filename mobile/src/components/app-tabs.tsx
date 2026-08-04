@@ -33,26 +33,21 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="national-league">
-        <NativeTabs.Trigger.Label hidden>National League</NativeTabs.Trigger.Label>
+      {/* League is the way in to the national table, the divisions and the
+       * leaders board — those three were tabs of their own and are now
+       * options on the league page. */}
+      <NativeTabs.Trigger name="divisions">
+        <NativeTabs.Trigger.Label hidden>League</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/nav/national-league.png')}
           renderingMode="original"
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="divisions">
-        <NativeTabs.Trigger.Label hidden>Divisions</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="activity">
+        <NativeTabs.Trigger.Label hidden>Activity</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/nav/divisions.png')}
-          renderingMode="original"
-        />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="leaders">
-        <NativeTabs.Trigger.Label hidden>Leaders</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/nav/leaders.png')}
+          src={require('@/assets/images/nav/activity.png')}
           renderingMode="original"
         />
       </NativeTabs.Trigger>

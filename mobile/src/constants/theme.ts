@@ -410,15 +410,24 @@ export const LeagueStripTextMinWidth = 208;
  * the pills' height (bodySmall on ButtonVariants' tab padding) so the row
  * reads as one band rather than the icon setting its own height. */
 export const SearchIconSize = 28;
-/** Bottom nav bar icons. Bounded by width, not height — and specifically by
- * the narrowest tab, not the average one. The bar splits into two equal
- * halves either side of the Catch button (it has to; see app-tabs.web.tsx),
- * and the right half divides its width three ways against the left's two.
- * That gives ~41px per right-hand tab on a 360px phone, which is what caps
- * this: at 40 the three right icons ended up 1.3px apart.
+/** Bottom nav bar icons. Bounded by width, not height: the bar splits into
+ * two equal halves either side of the Catch button (it has to; see
+ * app-tabs.web.tsx), and four tabs divide 2/2, giving ~62px per tab on a
+ * 360px phone. These replaced the text labels, so the icon is the whole
+ * target — there's no caption beneath it to share the height with, which is
+ * why it can run this large.
  *
- * These replaced the text labels, so the icon is the whole target — there's
- * no caption beneath it to share the height with, which is why it can run
- * this large at all. The bar's depth follows from it: raising this deepens
- * the bar by the same amount. */
+ * There is headroom here now. The old five-tab bar split 2/3, which left
+ * right-hand tabs a third narrower at ~41px and is why this sits at 36; the
+ * even split has since bought back ~20px per tab. The bar's depth follows
+ * from this value, so raising it deepens the bar by the same amount. */
 export const NavIconSize = 36;
+/** Box for the activity icon specifically. Its artwork is 1.63:1 where every
+ * other nav symbol is near-square, so squaring it leaves the art filling only
+ * ~61% of the box height — in a row of icons it reads as the small one.
+ *
+ * Sized to match the others by area rather than by height: `NavIconSize *
+ * sqrt(1.63)` = 46, which puts ~46x28 of artwork on screen against their
+ * ~36x36. Matching height instead would need a 59px box, which at four tabs
+ * leaves almost no gap to its neighbour on a 360px phone. */
+export const NavIconSizeWide = 46;

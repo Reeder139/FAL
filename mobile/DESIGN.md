@@ -178,7 +178,8 @@ Don't invent new division colors per screen — always pull `divisionOne` /
 | `LeagueStripBannerHeight` | `{ min: 28, max: 48 }` | Join banner in the League Position strip, clamped — see below |
 | `LeagueStripTextMinWidth` | 208 | Width the strip reserves for its text column before sizing the banner |
 | `SearchIconSize` | 28 | Member-search icon on the feed, right-aligned on the tab pills' row |
-| `NavIconSize` | 36 | Bottom nav bar icons — bounded by the narrowest tab (~41px at 360), not height |
+| `NavIconSize` | 36 | Bottom nav bar icons — bounded by tab width (~62px at 360), not height |
+| `NavIconSizeWide` | 46 | Box for the activity icon, whose art is 1.63:1 — area-matched to the rest |
 
 ### Bottom nav bar
 
@@ -216,15 +217,28 @@ two-line text labels. Depth is derived, not chosen: it's the icon plus the
 button and container padding, so `NavIconSize` is the only number to change
 if the bar should be deeper or shallower.
 
-**What caps the icon size.** The bar splits into two equal halves either side
-of the Catch button, and the left half holds 2 tabs against the right's 3 —
-so right-hand tabs are a third narrower, and they're what the icon has to fit.
-That split has to stay even: the FAB is centred on the viewport, so the gap
-between the groups is only centred when both groups are the same width.
-Weighting each group by its tab count equalises tab widths but slides the gap
-left, and the FAB then sits over the Divisions icon. At 360px this leaves
-~41px per right-hand tab, giving 5.3px between icons at 36 — and 1.3px at 40,
-which is why 40 was backed out.
+**Tab order** is Feed, League, [Catch], Activity, Profile — four tabs splitting
+2/2 around the raised button. League is the way in to the national table, the
+divisions and the leaders board, which were tabs of their own until they became
+options on the league page.
+
+**What caps the icon size.** The bar splits into two equal halves either side of
+the Catch button, and that split has to stay even: the FAB is centred on the
+viewport, so the gap between the groups is only centred when both groups are the
+same width. Weighting each group by its tab count slides the gap left and the FAB
+ends up over an icon.
+
+With four tabs that's 2/2, so every tab is the same ~62px width at 360 and there
+is headroom above 36. It was tighter at five: a 2/3 split left right-hand tabs at
+~41px, giving 5.3px between icons at 36 and 1.3px at 40 — which is why 40 was
+backed out then. Adding a fifth tab back brings that constraint with it.
+
+**Mismatched aspects.** The activity artwork is 1.63:1 where the others are
+0.98–1.26, so squaring it leaves the art filling ~61% of the box height and
+reading as the small icon in the row. It gets `NavIconSizeWide` instead —
+`NavIconSize * sqrt(1.63)`, which matches the others by *area* (~46×28 against
+~36×36). Matching by height would need a 59px box and leave almost no gap to its
+neighbour at 360. Any future icon this far from square needs the same treatment.
 
 ### The League Position strip's join banner
 

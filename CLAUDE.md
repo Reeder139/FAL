@@ -43,14 +43,22 @@ shared shell (background, safe area, the "Your Current League Position" strip, a
 the "Real Anglers | Real Fish | Real Prizes" strapline beneath it)
 for every screen reachable from the bottom tab bar. **Any new screen under
 `(tabs)/` — whether a top-level tab or nested in its own stack (see
-`(tabs)/league/` for the pattern: a division drill-down page that still keeps the
-tab bar and Catch FAB visible) — wraps its content in `<TabScreen>` instead of
+`(tabs)/divisions/` for the pattern: the League tab's stack, holding the division
+drill-down plus the national table and leaders board, all keeping the tab bar and
+Catch FAB visible) — wraps its content in `<TabScreen>` instead of
 reimplementing the outer `View`/`SafeAreaView` pair.** This is what makes "every
 page keeps both bars" a property of the template rather than something to
 remember per screen: change `TabScreen` (or `LeagueStrip`, or `TagLine`) once and
 every page picks it up. Screens outside the tabs entirely (auth, onboarding,
 `log-catch`'s modal, the `join` placeholder) don't use it — there's no tab bar to
 keep visible there by construction, so they get no strip and no strapline either.
+
+**A route directly under `(tabs)/` needs a matching `TabTrigger` in
+`app-tabs.web.tsx`.** Without one, `AppTabs` throws on web and `router.push` to
+that route silently does nothing — the page is still built and still typechecks,
+it just can't be reached. So a page that loses its tab doesn't stay put: move it
+into the stack of whichever tab now links to it (this is why `national-league`
+and `leaders` sit under `(tabs)/divisions/`).
 
 ## Core model: two layers, deliberately separated
 

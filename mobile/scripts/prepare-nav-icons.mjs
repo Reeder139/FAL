@@ -12,6 +12,11 @@
 // (widest) out-weighing the profile ring (tallest) once they sit side by
 // side at identical box sizes.
 //
+// The activity icon is the exception and is handled in the bar, not here:
+// at 1.63:1 it's far wider than the rest, so squaring it leaves the artwork
+// filling only ~61% of the box height and reading as a smaller icon. The bar
+// renders it in a wider box to compensate — see NavIconSizeWide.
+//
 // An earlier set of this artwork had each tab's name baked in underneath the
 // symbol, which this script cropped off. These replacements are symbol-only,
 // so there's nothing to strip — but the nav bar is still icon-only, and the
@@ -31,13 +36,19 @@ import sharp from 'sharp';
 const SRC_DIR = path.resolve('..', 'Images', 'nav icons new');
 const OUT_DIR = path.resolve('assets', 'images', 'nav');
 
-/** Source file -> bundled name. The numeric prefixes are the nav order. */
+/** Source file -> bundled name. The numeric prefixes are the order the art
+ * was delivered in, not the nav order — see app-tabs.web.tsx for that.
+ *
+ * divisions and leaders are still built even though the bar no longer shows
+ * them: they moved to options on the league page, and the art is 3-7KB each.
+ */
 const ICONS = [
   ['01_feed_symbol.png', 'feed.png'],
   ['02_national_league_symbol.png', 'national-league.png'],
   ['03_divisions_symbol.png', 'divisions.png'],
   ['04_leaders_symbol.png', 'leaders.png'],
   ['05_profile_symbol.png', 'profile.png'],
+  ['activity.png', 'activity.png'],
 ];
 
 /** Alpha at or below this counts as empty canvas. Low, so the crop keeps

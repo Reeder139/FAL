@@ -5,7 +5,7 @@ import { Image, Pressable, View, StyleSheet, type ImageSourcePropType } from 're
 import { FAB_SIZE } from './catch-fab';
 import { ThemedView } from './themed-view';
 
-import { MaxContentWidth, NavIconSize, Spacing } from '@/constants/theme';
+import { MaxContentWidth, NavIconSize, NavIconSizeWide, Spacing } from '@/constants/theme';
 
 // The raised Catch button floats centered over this bar (see catch-fab.tsx)
 // — it isn't one of the TabTriggers below. Reserve a gap the same width as
@@ -24,17 +24,18 @@ export default function AppTabs() {
           <TabTrigger name="home" href="/" asChild>
             <TabButton icon={require('@/assets/images/nav/feed.png')} label="Feed" />
           </TabTrigger>
-          <TabTrigger name="national-league" href="/national-league" asChild>
-            <TabButton
-              icon={require('@/assets/images/nav/national-league.png')}
-              label="National League"
-            />
-          </TabTrigger>
+          {/* League is the way in to the national table, the divisions and
+            * the leaders board — those three used to be tabs of their own and
+            * are now options on the league page. */}
           <TabTrigger name="divisions" href="/divisions" asChild>
-            <TabButton icon={require('@/assets/images/nav/divisions.png')} label="Divisions" />
+            <TabButton icon={require('@/assets/images/nav/national-league.png')} label="League" />
           </TabTrigger>
-          <TabTrigger name="leaders" href="/leaders" asChild>
-            <TabButton icon={require('@/assets/images/nav/leaders.png')} label="Leaders" />
+          <TabTrigger name="activity" href="/activity" asChild>
+            <TabButton
+              icon={require('@/assets/images/nav/activity.png')}
+              iconSize={NavIconSizeWide}
+              label="Activity"
+            />
           </TabTrigger>
           <TabTrigger name="profile" href="/profile" asChild>
             <TabButton icon={require('@/assets/images/nav/profile.png')} label="Profile" />
@@ -50,9 +51,12 @@ type TabButtonProps = TabTriggerSlotProps & {
   /** The tab's name. Not drawn — the artwork is the label now — but carried
    * as the accessible name, since a screen reader can't read a picture. */
   label: string;
+  /** Override for artwork whose aspect is far from square, so it can be
+   * given a box that matches the others by area. Defaults to NavIconSize. */
+  iconSize?: number;
 };
 
-export function TabButton({ icon, label, isFocused, ...props }: TabButtonProps) {
+export function TabButton({ icon, label, iconSize = NavIconSize, isFocused, ...props }: TabButtonProps) {
   return (
     <Pressable
       {...props}
@@ -73,7 +77,7 @@ export function TabButton({ icon, label, isFocused, ...props }: TabButtonProps) 
          * icon recognisable. */}
         <Image
           source={icon}
-          style={[styles.icon, !isFocused && styles.iconUnfocused]}
+          style={[{ width: iconSize, height: iconSize }, !isFocused && styles.iconUnfocused]}
           resizeMode="contain"
         />
       </ThemedView>
@@ -87,16 +91,15 @@ export function CustomTabList(props: TabListProps) {
   return (
     <View {...props} style={styles.tabListContainer}>
       <ThemedView type="backgroundElement" style={styles.innerContainer}>
-        {/* The two groups flex evenly even though the left holds 2 tabs and
-         * the right 3, so right-hand tabs come out narrower. That asymmetry
-         * is load-bearing: the Catch FAB is centred on the viewport, so the
-         * gap between the groups has to be centred too, and it only is when
-         * both groups are the same width. Weighting each group by its tab
-         * count equalises tab widths but slides the gap left, and the FAB
-         * then sits over the Divisions icon.
+        {/* Both groups flex evenly, which is what keeps the gap between them
+         * centred — the Catch FAB is centred on the viewport, not on the gap,
+         * so the two only line up when the groups are the same width.
          *
-         * The right group's 3-way split is therefore what bounds NavIconSize
-         * — see the note on that token. */}
+         * With four tabs that split 2/2, so every tab is the same width too.
+         * That wasn't true of the old five-tab bar: the left held 2 against
+         * the right's 3, making right-hand tabs a third narrower and capping
+         * how large the icons could go. Adding a tab back on either side
+         * brings that constraint with it. */}
         <View style={styles.tabGroup}>{triggers.slice(0, LEFT_TAB_COUNT)}</View>
         <View style={{ width: FAB_CLEARANCE }} />
         <View style={styles.tabGroup}>{triggers.slice(LEFT_TAB_COUNT)}</View>
@@ -150,10 +153,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.half,
     borderRadius: Spacing.three,
-  },
-  icon: {
-    width: NavIconSize,
-    height: NavIconSize,
   },
   iconUnfocused: {
     opacity: 0.65,

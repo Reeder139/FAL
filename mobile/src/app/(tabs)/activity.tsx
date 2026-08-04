@@ -1,15 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BottomTabInset, Spacing, Typography } from '@/constants/theme';
+import { TabScreen } from '@/components/tab-screen';
+import { BottomTabInset, MaxContentWidth, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function ActivityScreen() {
   const theme = useTheme();
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <SafeAreaView style={styles.safeArea}>
+    <TabScreen>
+      <View style={styles.content}>
         <Text style={[Typography.h1, { color: theme.text }]}>Activity</Text>
         <View style={styles.emptyState}>
           <Text style={[Typography.h2, { color: theme.text, textAlign: 'center' }]}>
@@ -19,17 +19,17 @@ export default function ActivityScreen() {
             Likes, comments, and new followers will show up here once they start coming in.
           </Text>
         </View>
-      </SafeAreaView>
-    </View>
+      </View>
+    </TabScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  content: {
     flex: 1,
-  },
-  safeArea: {
-    flex: 1,
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
     padding: Spacing.four,
     paddingBottom: BottomTabInset + Spacing.four,
     gap: Spacing.six,
