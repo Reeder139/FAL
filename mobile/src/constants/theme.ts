@@ -436,3 +436,11 @@ export const NavIconSize = 42;
  * art — but the bar sizes its row from the tallest icon box, so that
  * invisible padding would deepen the whole bar by 12px. */
 export const NavIconWide = { width: 54, height: 33 } as const;
+/** The division leader's avatar on the Leaders page. Sized to be the thing
+ * the eye lands on first in its card — it's the whole point of that screen,
+ * where it used to be a 64px thumbnail in a left-aligned row and read as
+ * incidental. Big enough to carry the trophy badge on its rim without the
+ * two crowding each other. */
+export const LeaderAvatarSize = 104;
+/** Trophy badge that sits on the leader avatar's rim. */
+export const LeaderBadgeSize = 34;
