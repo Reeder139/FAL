@@ -261,7 +261,7 @@ export default function LogCatchScreen() {
   }
 
   if (!session) {
-    return <Redirect href="/login" />;
+    return <Redirect href="/welcome" />;
   }
 
   if (result) {

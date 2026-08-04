@@ -19,7 +19,7 @@ export default function TabsLayout() {
   }
 
   if (!session) {
-    return <Redirect href="/login" />;
+    return <Redirect href="/welcome" />;
   }
 
   if (needsOnboarding) {

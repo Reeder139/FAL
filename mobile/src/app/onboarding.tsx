@@ -44,7 +44,7 @@ export default function OnboardingScreen() {
   }
 
   if (!session) {
-    return <Redirect href="/login" />;
+    return <Redirect href="/welcome" />;
   }
 
   // Already onboarded (declared_pb_oz is set) — nothing left to do here.
