@@ -1,10 +1,14 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { LeagueSummary } from '@/lib/leagueSummary';
 import { ordinal } from '@/lib/units';
+
+/** Source dimensions of the prepared banner (see
+ * scripts/prepare-join-banner.mjs). */
+const JOIN_BANNER_RATIO = 700 / 190;
 
 // TODO: real trend delta once we have standings history to diff against —
 // hardcoded placeholder for now, per the design ask.
@@ -63,10 +67,22 @@ export function LeagueStrip({ summary }: LeagueStripProps) {
       </Pressable>
 
       {showJoinPrompt && (
-        <Pressable onPress={() => router.push('/join')} style={styles.joinRow} hitSlop={Spacing.one}>
-          <Text style={[Typography.body, styles.joinLink, { color: theme.onPrimaryStrong }]}>
-            Join The League to win £20,000 Grand prize
-          </Text>
+        <Pressable
+          onPress={() => router.push('/join')}
+          accessibilityRole="button"
+          accessibilityLabel="Join the League to win the £20,000 grand prize"
+          style={styles.joinRow}
+          hitSlop={Spacing.one}>
+          {/* The ratio sits on a wrapper View, not the Image: on
+           * react-native-web an Image gets an inline height from its
+           * intrinsic pixel size, which overrides aspectRatio. */}
+          <View style={styles.joinBannerBox}>
+            <Image
+              source={require('@/assets/images/join-league-banner.png')}
+              style={styles.joinBanner}
+              resizeMode="contain"
+            />
+          </View>
         </Pressable>
       )}
     </View>
@@ -97,8 +113,13 @@ const styles = StyleSheet.create({
     // separates it from the standings.
     flex: 1,
   },
-  joinLink: {
-    fontWeight: '700',
-    textDecorationLine: 'underline',
+  joinBannerBox: {
+    width: '100%',
+    // Matches the prepared asset (700x190) so it never distorts.
+    aspectRatio: JOIN_BANNER_RATIO,
+  },
+  joinBanner: {
+    width: '100%',
+    height: '100%',
   },
 });
