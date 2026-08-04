@@ -66,7 +66,7 @@ export function LeagueStrip({ summary }: LeagueStripProps) {
 
       {showJoinPrompt && (
         <Pressable onPress={() => router.push('/join')} style={styles.joinRow} hitSlop={Spacing.one}>
-          <Text style={[Typography.caption, styles.joinLink, { color: theme.onPrimaryStrong }]}>
+          <Text style={[Typography.body, styles.joinLink, { color: theme.onPrimaryStrong }]}>
             Join The League to win £20,000 Grand prize
           </Text>
         </Pressable>
