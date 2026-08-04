@@ -42,7 +42,8 @@ function Card({ card, onDismiss }: { card: SuggestedFollowCard; onDismiss: (id: 
         <Pressable
           onPress={() => openAngler(card.id)}
           accessibilityRole="link"
-          accessibilityLabel={`View ${card.username}'s profile`}>
+          accessibilityLabel={`View ${card.username}'s profile`}
+          style={styles.avatarLink}>
           {card.avatarUrl ? (
             <Image source={{ uri: card.avatarUrl }} style={[styles.avatar, { borderColor: theme.gold }]} />
           ) : (
@@ -150,6 +151,15 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 1,
     marginBottom: Spacing.half,
+  },
+  /** Must fill avatarWrap. The avatar below sizes itself at 100% of its
+   * parent, so this link sitting between the two has to pass the box
+   * through — left unsized it shrinks to its content, the avatar's 100%
+   * resolves against nothing, and the circle collapses to its own 1px
+   * border. */
+  avatarLink: {
+    width: '100%',
+    height: '100%',
   },
   avatar: {
     width: '100%',
