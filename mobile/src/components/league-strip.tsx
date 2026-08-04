@@ -102,9 +102,11 @@ const styles = StyleSheet.create({
     borderRadius: Radii.xs,
   },
   textGroup: {
-    // Even split with the join prompt beside it — both wrap rather than
-    // either one truncating.
-    flex: 1,
+    // The larger share, sized so the label and the standings each fit on
+    // one line. That's what keeps the strip shallow: at an even split both
+    // wrapped to two lines and the text column, not the banner, was
+    // setting the strip's height.
+    flex: 1.6,
   },
   summaryLine: {
     marginTop: Spacing.half,
@@ -116,7 +118,7 @@ const styles = StyleSheet.create({
   },
   joinBannerBox: {
     width: '100%',
-    // Matches the prepared asset (700x190) so it never distorts.
+    // Matches the prepared asset (700x189) so it never distorts.
     aspectRatio: JOIN_BANNER_RATIO,
   },
   joinBanner: {
