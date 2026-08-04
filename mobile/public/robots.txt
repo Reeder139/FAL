@@ -1,0 +1,8 @@
+# Closed beta — nothing here should be indexed.
+#
+# This is the polite half of the block: robots.txt asks crawlers not to
+# fetch, but a URL someone links to can still be indexed without ever being
+# crawled. The X-Robots-Tag header in vercel.json is the half with teeth,
+# because it travels with the response itself.
+User-agent: *
+Disallow: /

@@ -5,5 +5,25 @@
   "rewrites": [
     { "source": "/league/:id", "destination": "/league/%5Bid%5D" },
     { "source": "/profile/:id", "destination": "/profile/%5Bid%5D" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json"
+        }
+      ]
+    }
   ]
 }
