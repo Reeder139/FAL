@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FollowButton } from '@/components/follow-button';
@@ -6,6 +6,7 @@ import { Radii, Shadows, Spacing, Typography } from '@/constants/theme';
 import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
 import type { FeedItemWithPhoto } from '@/lib/feed';
+import { setPostLike } from '@/lib/likes';
 import { formatWeightOz } from '@/lib/units';
 
 type PostCardProps = {
@@ -19,12 +20,35 @@ type PostCardProps = {
 export function PostCard({ item, viewerId, followingIds }: PostCardProps) {
   const theme = useTheme();
   const openAngler = useOpenAngler();
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState(item.liked_by_viewer);
   const [likeCount, setLikeCount] = useState(item.like_count);
 
-  const toggleLike = () => {
-    setLikeCount((count) => (liked ? count - 1 : count + 1));
-    setLiked((prev) => !prev);
+  // Resync when the feed refetches. Cards are keyed by post id and so are
+  // reused rather than remounted across a refresh, which would otherwise
+  // leave this state showing whatever it held before the fetch.
+  useEffect(() => {
+    setLiked(item.liked_by_viewer);
+    setLikeCount(item.like_count);
+  }, [item.liked_by_viewer, item.like_count]);
+
+  const toggleLike = async () => {
+    // Signed out there's nobody to attribute the like to, and the insert
+    // would fail RLS — leave the heart inert rather than flashing on and
+    // rolling straight back.
+    if (viewerId === null) return;
+
+    const next = !liked;
+    setLiked(next);
+    setLikeCount((count) => count + (next ? 1 : -1));
+    try {
+      await setPostLike(item.post_id, next);
+    } catch {
+      // Put it back. The server-side trigger owns like_count, so the true
+      // value returns on the next fetch either way — this is just so the
+      // card doesn't sit there claiming a like that didn't land.
+      setLiked(!next);
+      setLikeCount((count) => count + (next ? -1 : 1));
+    }
   };
 
   const isSelf = viewerId === item.author_id;
@@ -71,7 +95,17 @@ export function PostCard({ item, viewerId, followingIds }: PostCardProps) {
         )}
 
         <View style={styles.actions}>
-          <Pressable onPress={toggleLike} style={styles.likeButton} hitSlop={Spacing.two}>
+          {/* The heart is a glyph, so it announces as punctuation without a
+            * label. aria-pressed rather than a "Liked"/"Like" name flip, so
+            * the control keeps one name and reports its state separately. */}
+          <Pressable
+            onPress={toggleLike}
+            disabled={viewerId === null}
+            accessibilityRole="button"
+            accessibilityLabel={`Like ${item.username}'s post`}
+            aria-pressed={liked}
+            style={styles.likeButton}
+            hitSlop={Spacing.two}>
             <Text style={[Typography.h2, { color: liked ? theme.danger : theme.textMuted }]}>
               {liked ? '♥' : '♡'}
             </Text>

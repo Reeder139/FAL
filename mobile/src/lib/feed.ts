@@ -1,3 +1,4 @@
+import { fetchLikedPostIds } from '@/lib/likes';
 import { getPublicStorageUrl } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 
@@ -27,6 +28,9 @@ export interface FeedItem {
 
 export interface FeedItemWithPhoto extends FeedItem {
   photo_url: string | null;
+  /** Whether the signed-in angler has already liked this post. Resolved
+   * here, one query per page, so a card never has to ask for itself. */
+  liked_by_viewer: boolean;
 }
 
 export type FeedTab = 'following' | 'all' | 'league';
@@ -69,11 +73,13 @@ export async function fetchFeedPage(tab: FeedTab, cursor: string | null): Promis
   if (!rows || rows.length === 0) return { items: [], nextCursor: null };
 
   const postIds = rows.map((r) => r.post_id);
-  const { data: media, error: mediaError } = await supabase
-    .from('post_media')
-    .select('post_id, storage_path')
-    .in('post_id', postIds)
-    .eq('media_role', 'hero');
+
+  // Both in parallel: neither depends on the other, and the feed already
+  // waits on the page query before either can start.
+  const [{ data: media, error: mediaError }, likedPostIds] = await Promise.all([
+    supabase.from('post_media').select('post_id, storage_path').in('post_id', postIds).eq('media_role', 'hero'),
+    fetchLikedPostIds(postIds),
+  ]);
   if (mediaError) throw mediaError;
 
   const heroPathByPost = new Map((media ?? []).map((m) => [m.post_id, m.storage_path]));
@@ -84,6 +90,7 @@ export async function fetchFeedPage(tab: FeedTab, cursor: string | null): Promis
     photo_url: heroPathByPost.has(row.post_id)
       ? getPublicStorageUrl('post-media', heroPathByPost.get(row.post_id)!)
       : null,
+    liked_by_viewer: likedPostIds.has(row.post_id),
   }));
 
   return {
