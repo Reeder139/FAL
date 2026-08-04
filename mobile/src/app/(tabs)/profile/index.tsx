@@ -1,8 +1,9 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 
+import { CatchGrid } from '@/components/catch-grid';
 import { ProfileHeader } from '@/components/profile-header';
 import { TabScreen } from '@/components/tab-screen';
-import { ButtonVariants, MaxContentWidth, Spacing, Typography } from '@/constants/theme';
+import { BottomTabInset, ButtonVariants, MaxContentWidth, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { getPublicStorageUrl } from '@/lib/storage';
 import { useAuth } from '@/providers/auth-provider';
@@ -15,20 +16,23 @@ export default function ProfileScreen() {
 
   return (
     <TabScreen>
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {profile && (
-          <ProfileHeader
-            anglerId={profile.id}
-            avatarUrl={avatarUrl}
-            displayName={profile.display_name}
-            username={profile.username}
-            declaredPbOz={profile.declared_pb_oz}
-            pbVerified={profile.pb_verified}
-            followerCount={profile.follower_count}
-            followingCount={profile.following_count}
-            isSelf
-            isFollowing={false}
-          />
+          <>
+            <ProfileHeader
+              anglerId={profile.id}
+              avatarUrl={avatarUrl}
+              displayName={profile.display_name}
+              username={profile.username}
+              declaredPbOz={profile.declared_pb_oz}
+              pbVerified={profile.pb_verified}
+              followerCount={profile.follower_count}
+              followingCount={profile.following_count}
+              isSelf
+              isFollowing={false}
+            />
+            <CatchGrid anglerId={profile.id} />
+          </>
         )}
 
         <Pressable
@@ -46,24 +50,24 @@ export default function ProfileScreen() {
           ]}>
           <Text style={[Typography.button, { color: theme.danger }]}>Log out</Text>
         </Pressable>
-      </View>
+      </ScrollView>
     </TabScreen>
   );
 }
 
 const styles = StyleSheet.create({
   content: {
-    flex: 1,
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     alignItems: 'center',
-    paddingTop: Spacing.six,
+    paddingTop: Spacing.four,
     paddingHorizontal: Spacing.four,
+    paddingBottom: BottomTabInset + Spacing.four,
     gap: Spacing.two,
   },
   logoutButton: {
-    marginTop: Spacing.six,
+    marginTop: Spacing.five,
     alignItems: 'center',
   },
 });
