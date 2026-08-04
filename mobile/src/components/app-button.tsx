@@ -10,9 +10,20 @@ type AppButtonProps = {
   variant?: Variant;
   disabled?: boolean;
   loading?: boolean;
+  /** Spoken name, when the visible title is too terse to stand alone out of
+   * context — a screen reader announces the button without the layout around
+   * it that makes a one-word label obvious. Defaults to the title. */
+  accessibilityLabel?: string;
 };
 
-export function AppButton({ title, onPress, variant = 'primary', disabled, loading }: AppButtonProps) {
+export function AppButton({
+  title,
+  onPress,
+  variant = 'primary',
+  disabled,
+  loading,
+  accessibilityLabel,
+}: AppButtonProps) {
   const v = ButtonVariants[variant];
   const isOutline = variant === 'outline';
 
@@ -20,6 +31,8 @@ export function AppButton({ title, onPress, variant = 'primary', disabled, loadi
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? title}
       style={{
         backgroundColor: v.backgroundColor,
         borderRadius: v.borderRadius,

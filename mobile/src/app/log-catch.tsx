@@ -327,7 +327,17 @@ export default function LogCatchScreen() {
             {remainingSlots > 0 && (
               <View style={styles.pickButtonsRow}>
                 <View style={styles.pickButton}>
-                  <AppButton title="Choose from library" onPress={handlePickLibrary} variant="outline" />
+                  {/* Just "Library": the pair sit side by side on a phone, and
+                    * "Choose from library" wrapped to two lines against "Take
+                    * photo"'s one, leaving the buttons different heights. The
+                    * accessibility label carries the full wording, so the
+                    * short visible text costs a screen reader nothing. */}
+                  <AppButton
+                    title="Library"
+                    accessibilityLabel="Choose photos from your library"
+                    onPress={handlePickLibrary}
+                    variant="outline"
+                  />
                 </View>
                 <View style={styles.pickButton}>
                   <AppButton title="Take photo" onPress={handleCapture} variant="outline" />
