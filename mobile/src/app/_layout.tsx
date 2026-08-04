@@ -1,6 +1,5 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider } from '@/providers/auth-provider';
@@ -8,14 +7,14 @@ import { AuthProvider } from '@/providers/auth-provider';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  // Via @/hooks/use-color-scheme, not react-native's hook directly: the web
-  // variant re-resolves after hydration, which static rendering needs. With
-  // the raw hook this provider stayed on DefaultTheme, leaving
-  // react-navigation's #f2f2f2 backdrop behind every screen even in dark mode
-  // — hidden while a screen covers it, visible the moment one doesn't.
-  const colorScheme = useColorScheme();
+  // DarkTheme unconditionally, matching useTheme() — see the note there for
+  // why the app doesn't follow the device scheme. This also settles a bug it
+  // was masking: read from react-native's hook, this provider never left
+  // DefaultTheme, so react-navigation's #f2f2f2 sat behind every screen even
+  // for dark-mode users. Hidden while a screen fills the viewport, visible
+  // the moment one doesn't.
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={DarkTheme}>
       <AuthProvider>
         <AnimatedSplashOverlay />
         <Stack screenOptions={{ headerShown: false }}>

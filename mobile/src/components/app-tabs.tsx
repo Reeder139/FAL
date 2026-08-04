@@ -1,5 +1,4 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 
@@ -17,8 +16,8 @@ import { Colors } from '@/constants/theme';
  * single tint and throw the artwork away.
  */
 export default function AppTabs() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  // Always dark, matching useTheme() — see the note there.
+  const colors = Colors.dark;
 
   return (
     <NativeTabs
