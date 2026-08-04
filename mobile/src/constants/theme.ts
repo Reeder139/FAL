@@ -451,6 +451,16 @@ export const NavIconSize = 42;
  * art — but the bar sizes its row from the tallest icon box, so that
  * invisible padding would deepen the whole bar by 12px. */
 export const NavIconWide = { width: 54, height: 33 } as const;
+/** The hairlines that separate the bottom nav bar's icons from each other and
+ * from the raised Catch button.
+ *
+ * `height` is deliberately well short of the icon boxes (which stand ~58px
+ * with their padding): a rule that ran the bar's full depth would read as a
+ * wall chopping the bar into cells, where a short centred one reads as a
+ * separator between neighbours. It must not exceed the icon box height either
+ * — the bar takes its row height from its tallest child, so a taller divider
+ * would silently deepen the whole bar. */
+export const NavDividerSize = { width: 1, height: 30 } as const;
 /** The division leader's avatar on the Leaders page. Sized to be the thing
  * the eye lands on first in its card — it's the whole point of that screen,
  * where it used to be a 64px thumbnail in a left-aligned row and read as

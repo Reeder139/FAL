@@ -180,6 +180,7 @@ Don't invent new division colors per screen — always pull `divisionOne` /
 | `SearchIconSize` | 28 | Member-search icon on the feed, right-aligned on the tab pills' row |
 | `NavIconSize` | 42 | Bottom nav bar icons — bounded by tab width (~62px at 360), not height |
 | `NavIconWide` | 54×33 | Box for the activity icon, whose art is 1.63:1 — area-matched to the rest |
+| `NavDividerSize` | 1×30 | Hairlines between nav icons and either side of the Catch button |
 
 ### Bottom nav bar
 
@@ -210,6 +211,16 @@ underneath and no corner radius, since a radius there curved the bottom two
 corners away from the screen edge and showed the background through at each
 end. It keeps its horizontal inset, so it's a centred block anchored to the
 bottom rather than a full-bleed one.
+
+Four `NavDividerSize` hairlines in `borderStrong` separate the icons: one in
+each gap between neighbours, and one either side of the Catch button. The two
+flanking the button sit outside the tab groups, as siblings of the FAB
+spacer — inside a group, `space-evenly` would push them off the gap's edge.
+Being symmetric, they also leave the gap centred on the viewport, which is
+what the FAB is centred on. Their 30px height is well short of the ~58px icon
+boxes on purpose: a full-depth rule reads as a wall cutting the bar into
+cells, and anything taller than an icon box would deepen the whole bar, since
+the row takes its height from its tallest child.
 
 The Catch FAB's `bottom` offset tracks the bar's depth: it's set so the FAB
 overhangs the bar's top edge by ~14px. Anything that changes the bar's height

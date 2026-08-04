@@ -1,11 +1,12 @@
 import { Tabs, TabList, TabTrigger, TabSlot, TabTriggerSlotProps, TabListProps } from 'expo-router/ui';
-import { Children } from 'react';
+import { Children, type ReactNode } from 'react';
 import { Image, Pressable, View, StyleSheet, type ImageSourcePropType } from 'react-native';
 
 import { FAB_SIZE } from './catch-fab';
 import { ThemedView } from './themed-view';
 
-import { MaxContentWidth, NavIconSize, NavIconWide, Spacing } from '@/constants/theme';
+import { MaxContentWidth, NavDividerSize, NavIconSize, NavIconWide, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 // The raised Catch button floats centered over this bar (see catch-fab.tsx)
 // — it isn't one of the TabTriggers below. Reserve a gap the same width as
@@ -94,6 +95,22 @@ export function TabButton({
   );
 }
 
+/** One of the hairlines between nav icons.
+ *
+ * `aria-hidden` because it's pure decoration: the tab list is a row of
+ * buttons, and announcing four unlabelled separators between them adds
+ * nothing a screen reader user can act on. */
+function NavDivider() {
+  const theme = useTheme();
+  return <View aria-hidden style={[styles.divider, { backgroundColor: theme.borderStrong }]} />;
+}
+
+/** Drops a divider into each gap between siblings — n items, n-1 rules, and
+ * nothing at either end (the ends are handled around the FAB instead). */
+function withDividers(items: ReactNode[]): ReactNode[] {
+  return items.flatMap((item, i) => (i === 0 ? [item] : [<NavDivider key={`divider-${i}`} />, item]));
+}
+
 export function CustomTabList(props: TabListProps) {
   const triggers = Children.toArray(props.children);
 
@@ -109,9 +126,17 @@ export function CustomTabList(props: TabListProps) {
          * the right's 3, making right-hand tabs a third narrower and capping
          * how large the icons could go. Adding a tab back on either side
          * brings that constraint with it. */}
-        <View style={styles.tabGroup}>{triggers.slice(0, LEFT_TAB_COUNT)}</View>
+        {/* The two rules flanking the FAB gap sit outside the groups, as
+         * siblings of the spacer, rather than at the groups' inner edges.
+         * Placed inside they'd be pushed around by `space-evenly` and land
+         * short of the gap; out here they're pinned to it — and being
+         * symmetric, they leave the gap centred on the viewport, which is
+         * what the FAB is centred on. */}
+        <View style={styles.tabGroup}>{withDividers(triggers.slice(0, LEFT_TAB_COUNT))}</View>
+        <NavDivider />
         <View style={{ width: FAB_CLEARANCE }} />
-        <View style={styles.tabGroup}>{triggers.slice(LEFT_TAB_COUNT)}</View>
+        <NavDivider />
+        <View style={styles.tabGroup}>{withDividers(triggers.slice(LEFT_TAB_COUNT))}</View>
       </ThemedView>
     </View>
   );
@@ -150,6 +175,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-evenly',
+  },
+  divider: {
+    ...NavDividerSize,
+    // Must not flex: these are hairlines, and letting the row shrink or
+    // stretch them is the difference between a rule and a smudge.
+    flexGrow: 0,
+    flexShrink: 0,
   },
   pressed: {
     opacity: 0.7,
