@@ -21,7 +21,7 @@ export function CatchFab() {
         onPress={() => router.push('/log-catch')}
         accessibilityLabel="Log a catch"
         style={[styles.fab, { backgroundColor: theme.primary }, Shadows.glowPrimary]}>
-        <Ionicons name="camera" size={28} color={theme.onPrimary} />
+        <Ionicons name="add" size={28} color={theme.onPrimary} />
       </Pressable>
     </View>
   );
