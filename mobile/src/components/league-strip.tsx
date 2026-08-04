@@ -18,7 +18,7 @@ import { ordinal } from '@/lib/units';
  * drawn at this ratio, so if the artwork is any shorter than the ratio says,
  * the difference shows up as dead space inside the box that centring the box
  * can't remove. */
-const JOIN_BANNER_RATIO = 700 / 151;
+const JOIN_BANNER_RATIO = 700 / 139;
 
 // TODO: real trend delta once we have standings history to diff against —
 // hardcoded placeholder for now, per the design ask.
@@ -78,7 +78,10 @@ export function LeagueStrip({ summary }: LeagueStripProps) {
     Spacing.three * 2 - // the container's own horizontal padding
     Spacing.three - // the gap between the text and the banner
     LeagueStripTextMinWidth;
-  const bannerHeight = Math.round(
+  // Floor, not round: the width is derived back out of this height, so
+  // rounding up spends a couple of pixels the text column was promised and
+  // can be what tips the label onto a second line.
+  const bannerHeight = Math.floor(
     Math.min(Math.max(spareWidth / JOIN_BANNER_RATIO, LeagueStripBannerHeight.min), LeagueStripBannerHeight.max)
   );
 

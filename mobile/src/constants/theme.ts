@@ -399,7 +399,7 @@ export const SuggestedFollowsRailHeight = 146;
  * LeagueStripTextMinWidth) and sizes the banner from what's left, clamped
  * here — `min` keeps it legible on a 360px phone, `max` stops it dominating
  * the 800px content column on desktop. */
-export const LeagueStripBannerHeight = { min: 28, max: 60 } as const;
+export const LeagueStripBannerHeight = { min: 20, max: 60 } as const;
 /** Width the League Position strip reserves for its text column before
  * sizing the join banner. Measured: the "Your Current League Position"
  * label needs 205px on one line at `Typography.label`, and the standings

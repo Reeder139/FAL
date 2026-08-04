@@ -268,8 +268,11 @@ resulting height to `LeagueStripBannerHeight`. Measured result:
 
 | Viewport | Strip | Banner | Space above/below |
 |---|---|---|---|
-| 390 | 43 | 134×29 | 7 |
-| ≥534 | 69 | 278×60 | 4.6 |
+| 360 | 44 | 101×20 | 12 |
+| 390 | 44 | 131×26 | 9 |
+| ≥560 | 70 | 302×60 | 5 |
+
+Space above and below is equal at every width — the difference measures 0.
 
 The banner is always vertically centred in the strip, and the strip hugs it:
 past the point where the text column stops being the tallest thing in the row,
@@ -279,15 +282,27 @@ move independently. The `max` is the lever, and it only bites above ~534px
 wide; phones sit below it and are sized by the width left over instead, which
 is why the banner doesn't reach full height there.
 
-**`JOIN_BANNER_RATIO` must match the shipped asset exactly.** The box is drawn
-at that ratio and the image is `contain`-fitted into it, so if the artwork is
-shorter than the ratio claims, the shortfall becomes dead space *inside* the
-box — and centring the box in the strip cannot fix it, because the box is
-already centred. This bit once: the banner was cropped by which pixels the
-backdrop flood-fill had touched rather than by alpha, so pre-existing
-transparency in the source was counted as content and 56px of empty padding
-was baked into the bottom of the asset. The artwork sat top-aligned in its own
-frame and looked uncentred no matter what the layout did.
+**`JOIN_BANNER_RATIO` must match the shipped asset exactly, and the asset must
+be flush with its own edges.** The box is drawn at that ratio and the image is
+`contain`-fitted into it, so any margin baked into the artwork becomes dead
+space *inside* the box — which centring the box in the strip cannot fix,
+because the box is already centred. Chasing this in the layout is wasted
+effort; measure the asset instead.
+
+It bit twice, both times as "more space below than above":
+
+1. The crop box came from which pixels the backdrop flood-fill had touched
+   rather than from alpha, so transparency already present in the source
+   counted as content — 56px of empty padding baked into the bottom.
+2. After that was fixed, the badge's shadow tapered out below it. Sparse rows
+   still extended the box, and downsampling then softened the bottom edge more
+   than the top, leaving ~5 rows too faint to see but still inside the frame.
+
+Hence `prepare-join-banner.mjs` crops twice: once on the source (ignoring rows
+thinner than `SPARSE_FRACTION`), then again on the *resized* pixels against
+`SOLID_ALPHA`. The second pass is the one that guarantees it, whatever the
+resampler does. Re-run the script if the art changes and update the ratio
+constant to the new dimensions.
 
 **Don't size this from the strip's own height** (`alignSelf: 'stretch'` plus
 `aspectRatio`), which looks like the obvious way to make it fill. That's a

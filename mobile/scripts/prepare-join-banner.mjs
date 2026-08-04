@@ -37,6 +37,14 @@ const OUT = path.join(OUT_DIR, 'join-league-banner.png');
 const KEY_TOLERANCE = 72;
 /** Alpha at or below this counts as empty when working out the crop box. */
 const ALPHA_FLOOR = 16;
+/** A row (or column) needs opaque pixels covering at least this fraction of
+ * the canvas to count as content. Anything thinner is the badge's shadow
+ * tapering out — invisible on the dark strip, but enough to stretch the crop
+ * box and push the artwork off-centre inside it. */
+const SPARSE_FRACTION = 0.02;
+/** Alpha a pixel needs to count as the badge proper in the final trim, as
+ * opposed to the soft edge left behind by resampling. */
+const SOLID_ALPHA = 128;
 /** Bundled width. The strip renders it around 170px wide, so this is ~4x
  * for high-density screens without carrying the full source resolution. */
 const TARGET_WIDTH = 700;
@@ -94,29 +102,81 @@ async function main() {
   // its own whose RGB isn't near the sampled backdrop, so the flood fill
   // leaves them alone and a `cleared`-based box counts them as content. That
   // baked 56px of transparent padding into the bottom of the shipped banner
-  // and none into the top — so the artwork sat top-aligned inside its own
-  // frame, and no amount of centring the frame in the strip could fix it.
-  let minX = w;
-  let minY = h;
-  let maxX = -1;
-  let maxY = -1;
+  // and none into the top.
+  //
+  // A row or column also has to carry real weight to count, not just one
+  // stray pixel. The badge trails a soft shadow underneath it that thins to a
+  // handful of opaque pixels per row; those rows are invisible against the
+  // dark strip but still extended the box downwards, leaving the badge
+  // sitting high inside its own frame with ~12px of nothing beneath it. Since
+  // the frame is what gets centred in the strip, that read as "more space
+  // below than above" and no layout change could reach it.
+  const rowCount = new Int32Array(h);
+  const colCount = new Int32Array(w);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       if (data[(y * w + x) * channels + 3] <= ALPHA_FLOOR) continue;
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
+      rowCount[y]++;
+      colCount[x]++;
     }
   }
-  if (maxX < 0) throw new Error(`${SRC}: nothing left above alpha ${ALPHA_FLOOR} after keying`);
+  const rowFloor = Math.max(1, Math.round(w * SPARSE_FRACTION));
+  const colFloor = Math.max(1, Math.round(h * SPARSE_FRACTION));
+  let minY = h;
+  let maxY = -1;
+  for (let y = 0; y < h; y++) {
+    if (rowCount[y] < rowFloor) continue;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  let minX = w;
+  let maxX = -1;
+  for (let x = 0; x < w; x++) {
+    if (colCount[x] < colFloor) continue;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+  }
+  if (maxX < 0 || maxY < 0) throw new Error(`${SRC}: nothing left above alpha ${ALPHA_FLOOR} after keying`);
 
   const cropW = maxX - minX + 1;
   const cropH = maxY - minY + 1;
 
-  await sharp(data, { raw: { width: w, height: h, channels } })
+  // Resize first, then trim again against the result. The second pass is what
+  // actually guarantees the badge is centred in the frame it ships in.
+  // Cropping the source tightly isn't enough: downsampling softens the badge's
+  // bottom edge more than its top (the shadow is under it, not over it), which
+  // left ~5 rows at the bottom of the output too faint to see but still part
+  // of the image. Those rows are inside the box the strip centres, so they
+  // read as "more space below than above" — measured 0px above the badge
+  // against 2.1px below at render size. Trimming the resized pixels to the
+  // badge itself removes that by construction, whatever the resampler does.
+  const resized = await sharp(data, { raw: { width: w, height: h, channels } })
     .extract({ left: minX, top: minY, width: cropW, height: cropH })
     .resize({ width: TARGET_WIDTH, withoutEnlargement: true })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const rw = resized.info.width;
+  const rh = resized.info.height;
+  const rc = resized.info.channels;
+  const rd = resized.data;
+  let sMinX = rw;
+  let sMinY = rh;
+  let sMaxX = -1;
+  let sMaxY = -1;
+  for (let y = 0; y < rh; y++) {
+    for (let x = 0; x < rw; x++) {
+      if (rd[(y * rw + x) * rc + 3] < SOLID_ALPHA) continue;
+      if (x < sMinX) sMinX = x;
+      if (x > sMaxX) sMaxX = x;
+      if (y < sMinY) sMinY = y;
+      if (y > sMaxY) sMaxY = y;
+    }
+  }
+  if (sMaxX < 0) throw new Error(`${SRC}: nothing above alpha ${SOLID_ALPHA} after resizing`);
+
+  await sharp(rd, { raw: resized.info })
+    .extract({ left: sMinX, top: sMinY, width: sMaxX - sMinX + 1, height: sMaxY - sMinY + 1 })
     .png({ palette: true, quality: 90, effort: 10 })
     .toFile(OUT);
 
