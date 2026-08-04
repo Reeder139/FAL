@@ -1,8 +1,7 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
-import { BottomTabInset, Radii, Shadows, Spacing } from '@/constants/theme';
+import { BottomTabInset, CatchPlus, Radii, Shadows, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export const FAB_SIZE = Spacing.six;
@@ -26,7 +25,11 @@ export function CatchFab() {
         onPress={() => router.push('/log-catch')}
         accessibilityLabel="Log a catch"
         style={[styles.fab, { backgroundColor: theme.primary }, Shadows.glowPrimary]}>
-        <Ionicons name="add" size={28} color={theme.onPrimary} />
+        {/* Two bars rather than an icon-font glyph — see CatchPlus for why
+         * Ionicons' plus can't carry this. Absolutely positioned so they
+         * cross at the button's centre instead of stacking. */}
+        <View style={[styles.plusBar, styles.plusBarH, { backgroundColor: theme.onPrimary }]} />
+        <View style={[styles.plusBar, styles.plusBarV, { backgroundColor: theme.onPrimary }]} />
       </Pressable>
     </View>
   );
@@ -46,5 +49,17 @@ const styles = StyleSheet.create({
     borderRadius: Radii.circle,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  plusBar: {
+    position: 'absolute',
+    borderRadius: Radii.pill,
+  },
+  plusBarH: {
+    width: CatchPlus.length,
+    height: CatchPlus.thickness,
+  },
+  plusBarV: {
+    width: CatchPlus.thickness,
+    height: CatchPlus.length,
   },
 });

@@ -418,6 +418,13 @@ export const SearchIconSize = 28;
  * only ~41px on a 360px phone with My League showing. 36 leaves a couple of
  * px either side there and a comfortable margin at 390 and up. */
 export const RulesIconSize = 36;
+/** The plus on the Catch button, drawn as two bars rather than set from an
+ * icon font. Ionicons' plus glyphs — add, add-outline, add-sharp alike — are
+ * hairlines: ~115 lit pixels at 28px against ~465 for the camera icon this
+ * replaced, so on a bright button it renders but reads as blank. There's no
+ * heavier plus in the family, and stroke weight isn't something a font lets
+ * you set, so the shape is drawn here where it can be. */
+export const CatchPlus = { length: 26, thickness: 4 } as const;
 /** Bottom nav bar icons. Bounded by width, not height: the bar splits into
  * two equal halves either side of the Catch button (it has to; see
  * app-tabs.web.tsx), and four tabs divide 2/2, giving ~62px per tab on a
