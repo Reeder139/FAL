@@ -1,9 +1,9 @@
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FollowButton } from '@/components/follow-button';
 import { Radii, Shadows, Spacing, Typography } from '@/constants/theme';
+import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
 import type { FeedItemWithPhoto } from '@/lib/feed';
 import { formatWeightOz } from '@/lib/units';
@@ -18,7 +18,7 @@ type PostCardProps = {
 
 export function PostCard({ item, viewerId, followingIds }: PostCardProps) {
   const theme = useTheme();
-  const router = useRouter();
+  const openAngler = useOpenAngler();
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(item.like_count);
 
@@ -28,7 +28,9 @@ export function PostCard({ item, viewerId, followingIds }: PostCardProps) {
   };
 
   const isSelf = viewerId === item.author_id;
-  const goToProfile = () => router.push({ pathname: '/profile/[id]', params: { id: item.author_id } });
+  // Shared with every other place a name appears, so your own name lands on
+  // the profile tab here too rather than the public read-only view.
+  const goToProfile = () => openAngler(item.author_id);
 
   return (
     <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }, Shadows.card]}>

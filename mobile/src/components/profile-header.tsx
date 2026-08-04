@@ -27,9 +27,13 @@ type ProfileHeaderProps = {
   changingAvatar?: boolean;
 };
 
-/** Shared by the self profile screen and the view-another-angler screen —
- * avatar/name, follower/following counts (tap through to the list), and
- * the follow button, hidden entirely for isSelf rather than disabled. */
+/** Shared by the self profile screen and the view-another-angler screen.
+ *
+ * What you see of yourself and what you see of someone else deliberately
+ * differ: your own header carries the follower/following counts and taps
+ * through to those lists, while another angler's is picture, name and
+ * personal best — the public view. The follow button is the mirror image,
+ * hidden entirely for isSelf rather than disabled. */
 export function ProfileHeader({
   anglerId,
   avatarUrl,
@@ -90,16 +94,22 @@ export function ProfileHeader({
       <Text style={[Typography.h1, { color: theme.text }]}>{displayName}</Text>
       <Text style={[Typography.body, { color: theme.textSecondary }]}>@{username}</Text>
 
-      <View style={styles.countsRow}>
-        <Pressable onPress={() => goToConnections('followers')} style={styles.countItem}>
-          <Text style={[Typography.statValue, { color: theme.text }]}>{followerCountLocal}</Text>
-          <Text style={[Typography.label, { color: theme.label }]}>Followers</Text>
-        </Pressable>
-        <Pressable onPress={() => goToConnections('following')} style={styles.countItem}>
-          <Text style={[Typography.statValue, { color: theme.text }]}>{followingCount}</Text>
-          <Text style={[Typography.label, { color: theme.label }]}>Following</Text>
-        </Pressable>
-      </View>
+      {/* Your own network only. Another angler's public profile is picture,
+       * name and personal best — the number of people they follow, and the
+       * tap-through to the list of who those people are, isn't yours to
+       * browse from a name you tapped in a league table. */}
+      {isSelf && (
+        <View style={styles.countsRow}>
+          <Pressable onPress={() => goToConnections('followers')} style={styles.countItem}>
+            <Text style={[Typography.statValue, { color: theme.text }]}>{followerCountLocal}</Text>
+            <Text style={[Typography.label, { color: theme.label }]}>Followers</Text>
+          </Pressable>
+          <Pressable onPress={() => goToConnections('following')} style={styles.countItem}>
+            <Text style={[Typography.statValue, { color: theme.text }]}>{followingCount}</Text>
+            <Text style={[Typography.label, { color: theme.label }]}>Following</Text>
+          </Pressable>
+        </View>
+      )}
 
       {!isSelf && (
         <FollowButton

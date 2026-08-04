@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Radii, Spacing, Typography } from '@/constants/theme';
+import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchSuggestedAnglers, followAngler, type SuggestedAngler } from '@/lib/follows';
 
@@ -13,6 +14,7 @@ type SuggestedAnglersListProps = {
 
 export function SuggestedAnglersList({ onFollowed }: SuggestedAnglersListProps) {
   const theme = useTheme();
+  const openAngler = useOpenAngler();
   const [anglers, setAnglers] = useState<SuggestedAngler[] | null>(null);
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
 
@@ -58,19 +60,28 @@ export function SuggestedAnglersList({ onFollowed }: SuggestedAnglersListProps) 
         const followed = followedIds.has(angler.id);
         return (
           <View key={angler.id} style={[styles.row, { borderColor: theme.border }]}>
-            {angler.avatarUrl ? (
-              <Image source={{ uri: angler.avatarUrl }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, { backgroundColor: theme.surfaceElevated }]} />
-            )}
-            <View style={styles.info}>
-              <Text style={[Typography.h3, { color: theme.text }]} numberOfLines={1}>
-                {angler.displayName}
-              </Text>
-              <Text style={[Typography.caption, { color: theme.textMuted }]} numberOfLines={1}>
-                {angler.reason === 'division_leader' ? `Leading ${angler.divisionName}` : 'Recently posted'}
-              </Text>
-            </View>
+            {/* Avatar and name in one target, kept a sibling of the Follow
+             * button rather than wrapping it: nested Pressables both fire on
+             * web, so Follow would navigate away as it followed. */}
+            <Pressable
+              onPress={() => openAngler(angler.id)}
+              accessibilityRole="link"
+              accessibilityLabel={`View ${angler.displayName}'s profile`}
+              style={styles.identity}>
+              {angler.avatarUrl ? (
+                <Image source={{ uri: angler.avatarUrl }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, { backgroundColor: theme.surfaceElevated }]} />
+              )}
+              <View style={styles.info}>
+                <Text style={[Typography.h3, { color: theme.text }]} numberOfLines={1}>
+                  {angler.displayName}
+                </Text>
+                <Text style={[Typography.caption, { color: theme.textMuted }]} numberOfLines={1}>
+                  {angler.reason === 'division_leader' ? `Leading ${angler.divisionName}` : 'Recently posted'}
+                </Text>
+              </View>
+            </Pressable>
             <Pressable
               onPress={() => handleFollow(angler.id)}
               disabled={followed}
@@ -112,6 +123,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: Radii.circle,
+  },
+  /** Takes the row's slack, so the Follow button stays hard right and the
+   * whole of the name area — not just the glyphs — opens the profile. */
+  identity: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   info: {
     flex: 1,

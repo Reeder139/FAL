@@ -5,6 +5,7 @@ import type { NativeScrollEvent, NativeSyntheticEvent, View as ViewType } from '
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BottomTabInset, Radii, Spacing, Typography } from '@/constants/theme';
+import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchLeagueTableWithGhost, type LeagueTableRow } from '@/lib/leagueTable';
 import { formatWeightOz } from '@/lib/units';
@@ -39,8 +40,10 @@ type RowProps = {
 
 function TableRow({ row, showDivisionBadge, onJoin }: RowProps) {
   const theme = useTheme();
+  const openAngler = useOpenAngler();
   const divisionColor = theme[DIVISION_COLOR_KEYS[(row.divisionRank - 1) % 3]];
   const hasScored = row.countingFish > 0;
+  const openProfile = () => openAngler(row.anglerId);
 
   return (
     <View
@@ -60,19 +63,27 @@ function TableRow({ row, showDivisionBadge, onJoin }: RowProps) {
         </Text>
       </View>
 
-      {row.avatarUrl ? (
-        <Image source={{ uri: row.avatarUrl }} style={styles.avatar} />
-      ) : (
-        <View style={[styles.avatar, { backgroundColor: theme.surfaceElevated }]} />
-      )}
+      <Pressable onPress={openProfile} accessibilityRole="link" accessibilityLabel={`View ${row.username}'s profile`}>
+        {row.avatarUrl ? (
+          <Image source={{ uri: row.avatarUrl }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: theme.surfaceElevated }]} />
+        )}
+      </Pressable>
 
       <View style={styles.rowInfo}>
         <View style={styles.rowNameLine}>
-          <Text
-            style={[Typography.h3, { color: row.isGhost ? theme.textSecondary : theme.text }]}
-            numberOfLines={1}>
-            {row.username}
-          </Text>
+          {/* The name is its own target, with the Join pill left a sibling
+           * beside it rather than wrapped inside. On web a tap inside a
+           * nested Pressable fires both handlers, so a ghost row's Join
+           * would open that angler's profile on the way past. */}
+          <Pressable onPress={openProfile} accessibilityRole="link" style={styles.nameButton}>
+            <Text
+              style={[Typography.h3, { color: row.isGhost ? theme.textSecondary : theme.text }]}
+              numberOfLines={1}>
+              {row.username}
+            </Text>
+          </Pressable>
           {row.isGhost && <JoinPill onPress={onJoin} />}
         </View>
 
@@ -299,6 +310,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
+  },
+  /** Shrinks so a long name truncates rather than pushing the Join pill off
+   * the row, but doesn't grow — the tap target should end at the name, not
+   * stretch across the empty space beside it. */
+  nameButton: {
+    flexShrink: 1,
   },
   rowMetaLine: {
     flexDirection: 'row',

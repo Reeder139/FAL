@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -31,6 +31,12 @@ export default function AnglerProfileScreen() {
       cancelled = true;
     };
   }, [id]);
+
+  // Your own id lands on the profile tab instead — the editable one, with
+  // the avatar picker and catch grid. useOpenAngler() already routes taps on
+  // your own name there, so this is for anyone arriving by deep link or a
+  // shared URL.
+  if (angler?.isSelf) return <Redirect href="/profile" />;
 
   return (
     <TabScreen>

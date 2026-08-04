@@ -4,6 +4,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, Vi
 
 import { FollowButton } from '@/components/follow-button';
 import { MaxContentWidth, Radii, Spacing, SuggestedFollowsRailHeight, Typography } from '@/constants/theme';
+import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
 import { dismissSuggestion, fetchSuggestedFollows, type SuggestedFollowCard } from '@/lib/suggestedFollows';
 import { ordinal } from '@/lib/units';
@@ -23,6 +24,7 @@ const MAX_CARD_WIDTH = 76;
 
 function Card({ card, onDismiss }: { card: SuggestedFollowCard; onDismiss: (id: string) => void }) {
   const theme = useTheme();
+  const openAngler = useOpenAngler();
   const accent =
     card.divisionRank !== null ? theme[DIVISION_COLOR_KEYS[(card.divisionRank - 1) % 3]] : theme.primary;
 
@@ -34,13 +36,21 @@ function Card({ card, onDismiss }: { card: SuggestedFollowCard; onDismiss: (id: 
        * hairline in `border` all but vanishes against the background, and
        * anglers with no avatar yet would be near-invisible discs. */}
       <View style={styles.avatarWrap}>
-        {card.avatarUrl ? (
-          <Image source={{ uri: card.avatarUrl }} style={[styles.avatar, { borderColor: theme.gold }]} />
-        ) : (
-          <View
-            style={[styles.avatar, { backgroundColor: theme.surfaceElevated, borderColor: theme.gold }]}
-          />
-        )}
+        {/* The dismiss button below stays a sibling of this one, not a child.
+         * Nested Pressables both fire on web, so dismissing would open the
+         * profile of the angler you were dismissing. */}
+        <Pressable
+          onPress={() => openAngler(card.id)}
+          accessibilityRole="link"
+          accessibilityLabel={`View ${card.username}'s profile`}>
+          {card.avatarUrl ? (
+            <Image source={{ uri: card.avatarUrl }} style={[styles.avatar, { borderColor: theme.gold }]} />
+          ) : (
+            <View
+              style={[styles.avatar, { backgroundColor: theme.surfaceElevated, borderColor: theme.gold }]}
+            />
+          )}
+        </Pressable>
         <Pressable
           onPress={() => onDismiss(card.id)}
           accessibilityRole="button"
@@ -51,9 +61,11 @@ function Card({ card, onDismiss }: { card: SuggestedFollowCard; onDismiss: (id: 
         </Pressable>
       </View>
 
-      <Text style={[Typography.caption, styles.username, { color: theme.text }]} numberOfLines={1}>
-        {card.username}
-      </Text>
+      <Pressable onPress={() => openAngler(card.id)} accessibilityRole="link">
+        <Text style={[Typography.caption, styles.username, { color: theme.text }]} numberOfLines={1}>
+          {card.username}
+        </Text>
+      </Pressable>
 
       {card.divisionRank !== null && card.positionInDivision !== null && (
         <Text style={[Typography.caption, { color: accent }]} numberOfLines={1}>

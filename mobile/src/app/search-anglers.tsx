@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FollowButton } from '@/components/follow-button';
 import { FormField } from '@/components/form-field';
 import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
+import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
 import { searchAnglers, type AnglerSearchResult } from '@/lib/anglerSearch';
 import { useAuth } from '@/providers/auth-provider';
@@ -31,27 +32,41 @@ const MIN_QUERY_LENGTH = 2;
 
 function ResultRow({ angler }: { angler: AnglerSearchResult }) {
   const theme = useTheme();
+  const openAngler = useOpenAngler();
 
   return (
     <View style={styles.row}>
-      {angler.avatarUrl ? (
-        <Image source={{ uri: angler.avatarUrl }} style={[styles.avatar, { borderColor: theme.border }]} />
-      ) : (
-        <View
-          style={[styles.avatar, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}
-        />
-      )}
+      {/* Replace, not push: this screen is a modal, and leaving it stacked
+       * underneath the profile you opened from it means backing out of the
+       * profile drops you into a stale search rather than the feed.
+       *
+       * Avatar and name are one target, kept a sibling of the Follow button
+       * — nested Pressables both fire on web, so Follow would navigate away
+       * as it followed. */}
+      <Pressable
+        onPress={() => openAngler(angler.id, { replace: true })}
+        accessibilityRole="link"
+        accessibilityLabel={`View ${angler.displayName}'s profile`}
+        style={styles.identity}>
+        {angler.avatarUrl ? (
+          <Image source={{ uri: angler.avatarUrl }} style={[styles.avatar, { borderColor: theme.border }]} />
+        ) : (
+          <View
+            style={[styles.avatar, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}
+          />
+        )}
 
-      {/* Takes the slack between the avatar and the button, so the button
-       * lands hard against the right edge whatever the name's length. */}
-      <View style={styles.names}>
-        <Text style={[Typography.h3, { color: theme.text }]} numberOfLines={1}>
-          {angler.displayName}
-        </Text>
-        <Text style={[Typography.caption, { color: theme.textMuted }]} numberOfLines={1}>
-          @{angler.username}
-        </Text>
-      </View>
+        {/* Takes the slack between the avatar and the button, so the button
+         * lands hard against the right edge whatever the name's length. */}
+        <View style={styles.names}>
+          <Text style={[Typography.h3, { color: theme.text }]} numberOfLines={1}>
+            {angler.displayName}
+          </Text>
+          <Text style={[Typography.caption, { color: theme.textMuted }]} numberOfLines={1}>
+            @{angler.username}
+          </Text>
+        </View>
+      </Pressable>
 
       <FollowButton anglerId={angler.id} initialIsFollowing={angler.isFollowing} size="small" />
     </View>
@@ -221,6 +236,14 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: Radii.circle,
     borderWidth: 1,
+  },
+  /** Takes the row's slack, so the Follow button stays hard right and the
+   * whole of the name area — not just the glyphs — opens the profile. */
+  identity: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
   },
   names: {
     flex: 1,

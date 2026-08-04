@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { TabScreen } from '@/components/tab-screen';
 import {
@@ -12,6 +12,7 @@ import {
   Spacing,
   Typography,
 } from '@/constants/theme';
+import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
 import {
   fetchDivisionLeaders,
@@ -29,6 +30,7 @@ const PLACEHOLDER_DELTA = '▲ 3';
 
 function LeaderCard({ division, index }: { division: DivisionLeaderRow; index: number }) {
   const theme = useTheme();
+  const openAngler = useOpenAngler();
   const accent = theme[DIVISION_COLOR_KEYS[index % DIVISION_COLOR_KEYS.length]];
   const leader = division.leader;
 
@@ -54,7 +56,11 @@ function LeaderCard({ division, index }: { division: DivisionLeaderRow; index: n
       {leader ? (
         <>
           <View style={styles.leaderHero}>
-            <View style={styles.avatarWrap}>
+            <Pressable
+              onPress={() => openAngler(leader.anglerId)}
+              accessibilityRole="link"
+              accessibilityLabel={`View ${leader.displayName}'s profile`}
+              style={styles.avatarWrap}>
               {leader.avatarUrl ? (
                 <Image source={{ uri: leader.avatarUrl }} style={[styles.avatar, { borderColor: accent }]} />
               ) : (
@@ -68,16 +74,19 @@ function LeaderCard({ division, index }: { division: DivisionLeaderRow; index: n
                 style={[styles.trophyBadge, { backgroundColor: accent, borderColor: theme.surface }]}>
                 <Ionicons name="trophy" size={18} color={theme.onPrimary} />
               </View>
-            </View>
+            </Pressable>
 
-            <View style={styles.leaderNameRow}>
+            <Pressable
+              onPress={() => openAngler(leader.anglerId)}
+              accessibilityRole="link"
+              style={styles.leaderNameRow}>
               <Text style={[Typography.h2, { color: theme.text }]} numberOfLines={1}>
                 {leader.displayName}
               </Text>
               {leader.identityVerified && (
                 <Ionicons name="checkmark-circle" size={16} color={theme.primary} />
               )}
-            </View>
+            </Pressable>
 
             {leader.venueName && (
               <Text style={[Typography.bodySmall, { color: accent }]} numberOfLines={1}>

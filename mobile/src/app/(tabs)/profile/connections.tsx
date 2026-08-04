@@ -6,6 +6,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 import { FollowButton } from '@/components/follow-button';
 import { TabScreen } from '@/components/tab-screen';
 import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
+import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchFollowingIds, fetchFollowList, type FollowListEntry, type FollowListKind } from '@/lib/follows';
 import { useAuth } from '@/providers/auth-provider';
@@ -18,6 +19,7 @@ const TITLE: Record<FollowListKind, string> = {
 export default function ConnectionsScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const openAngler = useOpenAngler();
   const { session } = useAuth();
   const { id, kind } = useLocalSearchParams<{ id: string; kind: FollowListKind }>();
   const [entries, setEntries] = useState<FollowListEntry[] | null>(null);
@@ -61,7 +63,7 @@ export default function ConnectionsScreen() {
             {entries.map((angler) => (
               <Pressable
                 key={angler.id}
-                onPress={() => router.push({ pathname: '/profile/[id]', params: { id: angler.id } })}
+                onPress={() => openAngler(angler.id)}
                 style={[styles.row, { borderColor: theme.border }]}>
                 {angler.avatarUrl ? (
                   <Image source={{ uri: angler.avatarUrl }} style={styles.avatar} />
