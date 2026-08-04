@@ -1,70 +1,16 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
+import { LeagueTable } from '@/components/league-table';
 import { TabScreen } from '@/components/tab-screen';
-import { BottomTabInset, MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
+import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { fetchNationalStandings, type NationalStandingRow, type NationalStandings } from '@/lib/divisions';
-import { formatWeightOz } from '@/lib/units';
+import { fetchNationalStandings, type NationalStandings } from '@/lib/divisions';
 
-const DIVISION_COLOR_KEYS = ['divisionOne', 'divisionTwo', 'divisionThree'] as const;
-const RANK_COLOR_KEYS = ['gold', 'silver', 'bronze'] as const;
-
-function StandingRowItem({ row }: { row: NationalStandingRow }) {
+export default function NationalLeagueScreen() {
   const theme = useTheme();
-  const rankColor = row.rank <= 3 ? theme[RANK_COLOR_KEYS[row.rank - 1]] : theme.textMuted;
-  const divisionColor = theme[DIVISION_COLOR_KEYS[(row.divisionRank - 1) % 3]];
-
-  return (
-    <View
-      style={[
-        styles.row,
-        { borderColor: theme.border },
-        row.isYou && { backgroundColor: theme.surfaceElevated, borderColor: theme.primary },
-      ]}>
-      <View style={[styles.rankBadge, row.rank <= 3 && { backgroundColor: rankColor }]}>
-        <Text style={[Typography.h3, { color: row.rank <= 3 ? theme.background : theme.textMuted }]}>
-          {row.rank}
-        </Text>
-      </View>
-
-      {row.avatarUrl ? (
-        <Image source={{ uri: row.avatarUrl }} style={styles.avatar} />
-      ) : (
-        <View style={[styles.avatar, { backgroundColor: theme.surfaceElevated }]} />
-      )}
-
-      <View style={styles.rowInfo}>
-        <View style={styles.rowNameLine}>
-          <Text style={[Typography.h3, { color: theme.text }]} numberOfLines={1}>
-            {row.displayName}
-          </Text>
-          {row.identityVerified && <Ionicons name="checkmark-circle" size={13} color={theme.primary} />}
-          {row.isYou && <Text style={[Typography.caption, { color: theme.primary }]}>You</Text>}
-        </View>
-        <View style={styles.rowMetaLine}>
-          {/* The one thing a national table needs that a divisional one
-           * doesn't: which division each angler is actually racing in. */}
-          <View style={[styles.divisionPill, { borderColor: divisionColor }]}>
-            <Text style={[Typography.caption, { color: divisionColor }]}>Div {row.divisionRank}</Text>
-          </View>
-          <Text style={[Typography.caption, { color: theme.textMuted }]} numberOfLines={1}>
-            {row.countingFish} fish · avg {row.avgWeightOz !== null ? formatWeightOz(row.avgWeightOz) : '—'}
-            {row.heaviestOz !== null ? ` · best ${formatWeightOz(row.heaviestOz)}` : ''}
-          </Text>
-        </View>
-      </View>
-
-      <Text style={[Typography.statValue, styles.points, { color: theme.primary }]}>
-        {row.points.toFixed(1)}
-      </Text>
-    </View>
-  );
-}
-
-export default function FFLeagueScreen() {
-  const theme = useTheme();
+  // Header stats only — the table itself, including the free-member ghost
+  // row, comes from LeagueTable.
   const [standings, setStandings] = useState<NationalStandings | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -89,7 +35,7 @@ export default function FFLeagueScreen() {
         <View style={styles.header}>
           <Text style={[Typography.h1, { color: theme.text }]}>National League</Text>
           {standings && (
-            <Text style={[Typography.bodySmall, { color: theme.primary }]}>{standings.seasonName}</Text>
+            <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>{standings.seasonName}</Text>
           )}
         </View>
 
@@ -106,7 +52,7 @@ export default function FFLeagueScreen() {
           </View>
         ) : (
           <>
-            <View style={[styles.infoStrip, { backgroundColor: theme.surface, borderColor: theme.primary }]}>
+            <View style={[styles.infoStrip, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <View style={styles.infoStat}>
                 <Text style={[Typography.label, { color: theme.label }]}>Anglers</Text>
                 <Text style={[Typography.body, { color: theme.text }]}>{standings.memberCount}</Text>
@@ -123,19 +69,7 @@ export default function FFLeagueScreen() {
               </View>
             </View>
 
-            {standings.rows.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>
-                  No qualifying catches yet this season.
-                </Text>
-              </View>
-            ) : (
-              <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-                {standings.rows.map((row) => (
-                  <StandingRowItem key={row.anglerId} row={row} />
-                ))}
-              </ScrollView>
-            )}
+            <LeagueTable divisionId={null} showDivisionBadge />
           </>
         )}
       </View>
@@ -176,53 +110,5 @@ const styles = StyleSheet.create({
   },
   infoStat: {
     gap: Spacing.half,
-  },
-  list: {
-    gap: Spacing.one,
-    paddingBottom: BottomTabInset + Spacing.four,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.two,
-    borderWidth: 1,
-    borderRadius: Radii.sm,
-  },
-  rankBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: Radii.circle,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: Radii.circle,
-  },
-  rowInfo: {
-    flex: 1,
-    gap: 1,
-  },
-  rowNameLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-  },
-  rowMetaLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-  },
-  divisionPill: {
-    borderWidth: 1,
-    borderRadius: Radii.xs,
-    paddingHorizontal: Spacing.one,
-  },
-  points: {
-    fontSize: 18,
-    lineHeight: 22,
   },
 });
