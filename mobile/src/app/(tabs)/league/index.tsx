@@ -63,6 +63,7 @@ export default function NationalLeagueScreen() {
   const [standings, setStandings] = useState<NationalStandings | null>(null);
   const [loading, setLoading] = useState(true);
 
+
   useEffect(() => {
     let cancelled = false;
     fetchNationalStandings()
