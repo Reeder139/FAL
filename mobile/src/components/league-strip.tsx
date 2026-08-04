@@ -9,6 +9,10 @@ import { ordinal } from '@/lib/units';
 /** Source dimensions of the prepared banner (see
  * scripts/prepare-join-banner.mjs). */
 const JOIN_BANNER_RATIO = 700 / 189;
+/** Ceiling on the banner's width. At phone width the column share already
+ * lands under this, so it only bites on wider viewports — where the banner
+ * would otherwise keep growing with the 800px content column. */
+const JOIN_BANNER_MAX_WIDTH = 150;
 
 // TODO: real trend delta once we have standings history to diff against —
 // hardcoded placeholder for now, per the design ask.
@@ -115,6 +119,11 @@ const styles = StyleSheet.create({
     // Takes the leftover width. The container's own `gap` is what
     // separates it from the standings.
     flex: 1,
+    // Capped, or the banner scales with the column: at the 800px content
+    // width it reached 288x78 and pushed the strip to 96px deep, leaving
+    // the standings floating in the middle of it. Past phone width the
+    // banner should stay put rather than grow.
+    maxWidth: JOIN_BANNER_MAX_WIDTH,
   },
   joinBannerBox: {
     width: '100%',
