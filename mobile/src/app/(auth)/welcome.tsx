@@ -26,6 +26,9 @@ const LOGO_RATIO = 1; // 2048x2048
 const PRIZE_BOX_RATIO = 2400 / 1400;
 const BUTTON_RATIO = 2400 / 600;
 const BOTTOM_RAIL_RATIO = 2400 / 900;
+// Shared with the tab template's strapline (see components/tag-line.tsx) —
+// the same prepared asset, not a login-specific copy.
+const TAGLINE_RATIO = 1320 / 67;
 
 type ArtProps = {
   source: ImageSourcePropType;
@@ -90,6 +93,13 @@ export default function WelcomeScreen() {
             ratio={LOGO_RATIO}
             label="Fantasy Fishing"
             style={styles.logo}
+          />
+
+          <Art
+            source={require('@/assets/images/tagline.png')}
+            ratio={TAGLINE_RATIO}
+            label="Real anglers. Real fish. Real prizes."
+            style={styles.tagline}
           />
 
           <Art
@@ -176,6 +186,12 @@ const styles = StyleSheet.create({
     // it's the tallest element, so it's the one worth constraining.
     maxWidth: 230,
     alignSelf: 'center',
+  },
+  tagline: {
+    // On top of the content container's own gap, so the strapline sits in a
+    // slightly wider band than the artwork above and below it rather than
+    // reading as part of the logo block.
+    marginVertical: Spacing.one,
   },
   spacer: {
     flexGrow: 1,
