@@ -50,18 +50,16 @@ export function LeagueStrip({ summary }: LeagueStripProps) {
   const showJoinPrompt = !summary.isPaidMember && summary.kind !== 'no_active_season';
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.primary, borderColor: theme.primary }]}>
+    <View style={[styles.container, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}>
       {/* The standings area and the join link go to different places, so
        * they're separate targets rather than one Pressable wrapping the
        * whole strip. They sit side by side, splitting the row. */}
       <Pressable onPress={() => router.push('/divisions')} style={styles.textGroup}>
-        <Text style={[Typography.label, { color: theme.onPrimaryStrong }]}>
-          Your Current League Position
-        </Text>
+        <Text style={[Typography.label, { color: theme.label }]}>Your Current League Position</Text>
         {/* Two lines rather than one: sharing the row with the join prompt
          * leaves too little width to fit the standings on a single line,
          * and truncating the position defeats the point of the strip. */}
-        <Text style={[Typography.bodySmall, styles.summaryLine, { color: theme.onPrimaryStrong }]} numberOfLines={2}>
+        <Text style={[Typography.bodySmall, styles.summaryLine, { color: theme.text }]} numberOfLines={2}>
           {summaryText(summary)}
         </Text>
       </Pressable>
@@ -95,7 +93,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.three,
-    borderBottomWidth: 1,
+    // Hairline all the way round rather than just underneath: the strip now
+    // sits only a shade off the page background, so the border is what
+    // actually defines its edge.
+    borderWidth: 1,
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
     borderRadius: Radii.xs,
