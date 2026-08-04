@@ -76,6 +76,7 @@ All sizes in px, `fontSize`/`lineHeight`. Font is the platform system font
 | `bodySmall` | 13 / 18 | 500 (medium) | Supporting copy |
 | `label` | 11 / 14 | 700 (bold), letter-spacing 0.8, uppercase | Eyebrow labels ("CURRENT DIVISION") |
 | `caption` | 12 / 16 | 500 (medium) | Timestamps, meta text |
+| `navLabel` | 10 / 13 | 600 (semibold) | Bottom tab bar labels — five tabs plus the raised Catch button leave ~47px each at phone width, so anything larger clips "Divisions" |
 | `button` | 15 / 20 | 700 (bold), letter-spacing 0.4, uppercase | Button labels |
 
 ### Font weights

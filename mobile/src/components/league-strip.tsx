@@ -45,7 +45,7 @@ export function LeagueStrip({ summary }: LeagueStripProps) {
 
   return (
     <Pressable
-      onPress={() => router.push('/league')}
+      onPress={() => router.push('/divisions')}
       style={[styles.container, { backgroundColor: theme.primary, borderColor: theme.primary }]}>
       <View style={styles.textGroup}>
         <Text style={[Typography.label, { color: theme.onPrimaryStrong }]}>Your Current League Position</Text>

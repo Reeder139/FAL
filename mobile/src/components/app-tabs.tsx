@@ -21,8 +21,15 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="league">
-        <NativeTabs.Trigger.Label>League</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="ff-league">
+        <NativeTabs.Trigger.Label>FF League</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          src={<NativeTabs.Trigger.VectorIcon family={Ionicons} name="earth-outline" />}
+        />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="divisions">
+        <NativeTabs.Trigger.Label>Divisions</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={<NativeTabs.Trigger.VectorIcon family={Ionicons} name="trophy-outline" />}
         />

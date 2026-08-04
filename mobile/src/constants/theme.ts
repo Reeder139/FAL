@@ -197,6 +197,11 @@ export const Typography = {
   },
   /** Timestamps and muted meta text */
   caption: { fontSize: 12, lineHeight: 16, fontWeight: FontWeight.medium },
+  /** Bottom tab bar labels. Smaller than `caption` because five tabs plus
+   * the raised Catch button leave roughly 47px per tab at phone width —
+   * anything larger clips "Divisions". Matches the ~10px platform tab
+   * bars use. */
+  navLabel: { fontSize: 10, lineHeight: 13, fontWeight: FontWeight.semibold },
   /** Button labels, e.g. "SUBMIT CATCH", "VOTE NOW" */
   button: {
     fontSize: 15,

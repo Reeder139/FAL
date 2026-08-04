@@ -439,3 +439,107 @@ export async function fetchDivisionStandings(divisionId: string): Promise<Divisi
 
   return { ...base, rows };
 }
+
+export interface NationalStandingRow extends StandingRow {
+  divisionName: string;
+  /** 1 = hardest — drives the division badge colour. */
+  divisionRank: number;
+}
+
+export interface NationalStandings {
+  seasonName: string;
+  /** Everyone with an active entry in the season, whether or not they've
+   * scored yet — so it can read "of 21" while the table lists fewer. */
+  memberCount: number;
+  rows: NationalStandingRow[];
+}
+
+/**
+ * The FF League: one national standing across every division, for the
+ * currently running season. Bragging rights only — no prize attaches to
+ * it, unlike the divisional tables.
+ *
+ * Reads national_league_table rather than league_table because the
+ * latter's `position` is a per-division placing; the national view
+ * re-ranks over the whole season. Same bulk-fetch shape as
+ * fetchDivisionStandings — one profiles query and one scored_catches
+ * query for the averages, rather than per-angler round trips.
+ */
+export async function fetchNationalStandings(): Promise<NationalStandings | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: season } = await supabase
+    .from('seasons')
+    .select('id, name, counting_fish')
+    .eq('status', 'running')
+    .limit(1)
+    .maybeSingle();
+  if (!season) return null;
+
+  const [{ data: tableRows }, { count: memberCount }, { data: divisions }] = await Promise.all([
+    supabase
+      .from('national_league_table')
+      .select('angler_id, division_id, total_points, counting_fish, best_fish_oz, position')
+      .eq('season_id', season.id)
+      .order('position'),
+    supabase
+      .from('season_entries')
+      .select('id', { count: 'exact', head: true })
+      .eq('season_id', season.id)
+      .is('left_at', null),
+    supabase.from('divisions').select('id, name, rank').eq('season_id', season.id),
+  ]);
+
+  const base = { seasonName: season.name, memberCount: memberCount ?? 0 };
+  if (!tableRows || tableRows.length === 0) return { ...base, rows: [] };
+
+  const anglerIds = tableRows.map((r) => r.angler_id);
+  const [{ data: profiles }, { data: countingCatches }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, username, display_name, avatar_path, identity_verified')
+      .in('id', anglerIds),
+    supabase
+      .from('scored_catches')
+      .select('angler_id, weight_oz')
+      .eq('season_id', season.id)
+      .lte('rank_in_season', season.counting_fish),
+  ]);
+
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+  const divisionMap = new Map((divisions ?? []).map((d) => [d.id, d]));
+  const weightsByAngler = new Map<string, number[]>();
+  for (const c of countingCatches ?? []) {
+    const arr = weightsByAngler.get(c.angler_id) ?? [];
+    arr.push(c.weight_oz);
+    weightsByAngler.set(c.angler_id, arr);
+  }
+
+  const rows: NationalStandingRow[] = tableRows.map((r) => {
+    const profile = profileMap.get(r.angler_id);
+    const division = divisionMap.get(r.division_id);
+    const weights = weightsByAngler.get(r.angler_id) ?? [];
+    const avgWeightOz =
+      weights.length > 0 ? Math.round(weights.reduce((sum, w) => sum + w, 0) / weights.length) : null;
+
+    return {
+      anglerId: r.angler_id,
+      rank: r.position,
+      displayName: profile?.display_name ?? '—',
+      username: profile?.username ?? '',
+      avatarUrl: profile?.avatar_path ? getPublicStorageUrl('post-media', profile.avatar_path) : null,
+      identityVerified: profile?.identity_verified ?? false,
+      points: r.total_points,
+      countingFish: r.counting_fish,
+      heaviestOz: r.best_fish_oz,
+      avgWeightOz,
+      isYou: r.angler_id === user?.id,
+      divisionName: division?.name ?? '—',
+      divisionRank: division?.rank ?? 1,
+    };
+  });
+
+  return { ...base, rows };
+}

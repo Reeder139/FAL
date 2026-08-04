@@ -6,14 +6,14 @@ import { FAB_SIZE } from './catch-fab';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing, Typography } from '@/constants/theme';
 
 // The raised Catch button floats centered over this bar (see catch-fab.tsx)
 // — it isn't one of the TabTriggers below. Reserve a gap the same width as
 // the FAB (plus its glow) in the middle of the tab row so it never sits on
 // top of a real tab, splitting the triggers into a left/right group either
 // side of it.
-const FAB_CLEARANCE = FAB_SIZE + Spacing.four;
+const FAB_CLEARANCE = FAB_SIZE + Spacing.two;
 const LEFT_TAB_COUNT = 2;
 
 export default function AppTabs() {
@@ -25,8 +25,11 @@ export default function AppTabs() {
           <TabTrigger name="home" href="/" asChild>
             <TabButton>Feed</TabButton>
           </TabTrigger>
-          <TabTrigger name="league" href="/league" asChild>
-            <TabButton>League</TabButton>
+          <TabTrigger name="ff-league" href="/ff-league" asChild>
+            <TabButton>FF League</TabButton>
+          </TabTrigger>
+          <TabTrigger name="divisions" href="/divisions" asChild>
+            <TabButton>Divisions</TabButton>
           </TabTrigger>
           <TabTrigger name="leaders" href="/leaders" asChild>
             <TabButton>Leaders</TabButton>
@@ -46,7 +49,10 @@ export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps
       <ThemedView
         type={isFocused ? 'backgroundSelected' : 'backgroundElement'}
         style={styles.tabButtonView}>
-        <ThemedText type="small" themeColor={isFocused ? 'text' : 'textSecondary'}>
+        <ThemedText
+          style={Typography.navLabel}
+          themeColor={isFocused ? 'text' : 'textSecondary'}
+          numberOfLines={1}>
           {children}
         </ThemedText>
       </ThemedView>
@@ -80,7 +86,7 @@ const styles = StyleSheet.create({
   },
   innerContainer: {
     paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.one,
     borderRadius: Spacing.five,
     flexDirection: 'row',
     alignItems: 'center',
@@ -103,7 +109,7 @@ const styles = StyleSheet.create({
   tabButtonView: {
     alignItems: 'center',
     paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.two,
+    paddingHorizontal: Spacing.half,
     borderRadius: Spacing.three,
   },
 });
