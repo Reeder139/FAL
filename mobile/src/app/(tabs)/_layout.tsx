@@ -5,6 +5,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import AppTabs from '@/components/app-tabs';
 import { CatchFab } from '@/components/catch-fab';
 import { ConvertPrompt } from '@/components/convert-prompt';
+import { RulesPromptHost, RulesPromptProvider } from '@/components/rules-prompt';
 import { useTheme } from '@/hooks/use-theme';
 import { useLeagueSummary } from '@/lib/leagueSummary';
 import { useAuth } from '@/providers/auth-provider';
@@ -65,14 +66,19 @@ export default function TabsLayout() {
   }
 
   return (
-    <View style={styles.container}>
-      <AppTabs />
-      {/* Catch isn't a real tab route — it's a raised button that opens
-       * /log-catch as a modal, so tapping it hides the bar entirely rather
-       * than swapping to yet another persistent tab. */}
-      <CatchFab />
-      <ConvertPrompt visible={promptVisible} onDismiss={() => setPromptVisible(false)} />
-    </View>
+    <RulesPromptProvider>
+      <View style={styles.container}>
+        <AppTabs />
+        {/* Catch isn't a real tab route — it's a raised button that opens
+         * /log-catch as a modal, so tapping it hides the bar entirely rather
+         * than swapping to yet another persistent tab. */}
+        <CatchFab />
+        <ConvertPrompt visible={promptVisible} onDismiss={() => setPromptVisible(false)} />
+        {/* Last, so it covers the tab bar and Catch button. Opened from the
+          * feed's header row via useRulesPrompt(). */}
+        <RulesPromptHost />
+      </View>
+    </RulesPromptProvider>
   );
 }
 

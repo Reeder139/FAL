@@ -1,16 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import {
-  Image,
-  Pressable,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-  type ImageSourcePropType,
-} from 'react-native';
+import type { ImageSourcePropType } from 'react-native';
 
-import { Colors, Radii, Spacing } from '@/constants/theme';
+import { OverlayCard } from '@/components/overlay-card';
 
 type Prompt = {
   source: ImageSourcePropType;
@@ -42,10 +35,10 @@ const ROTATION_KEY = 'fal.convertPromptIndex';
 /**
  * Which card to show, advancing the rotation for next time.
  *
- * Persisted rather than held in memory because the prompt now appears once
- * per session: an in-memory counter would reset on every launch alongside it,
- * so the first card would win every session and the second would never be
- * seen. Storage is what makes the rotation actually rotate.
+ * Persisted rather than held in memory because the prompt appears once per
+ * session: an in-memory counter would reset on every launch alongside it, so
+ * the first card would win every session and the second would never be seen.
+ * Storage is what makes the rotation actually rotate.
  */
 async function takeNextPrompt(): Promise<Prompt> {
   let index = 0;
@@ -60,18 +53,6 @@ async function takeNextPrompt(): Promise<Prompt> {
   return PROMPTS[index];
 }
 
-/** Fraction of the card, from its top-right corner, treated as the close
- * button. Both cards have an X baked into the artwork at roughly x 86-100%,
- * y 0-14%, so this covers it with a little margin without reaching into the
- * headline. */
-const CLOSE_HIT_FRACTION = 0.18;
-
-/** Most of the viewport the card may occupy. It's a tall-ish card and the
- * phone it has to fit on is taller still, so height is usually what binds,
- * not width. */
-const MAX_WIDTH = 440;
-const MAX_HEIGHT_FRACTION = 0.78;
-
 type ConvertPromptProps = {
   visible: boolean;
   onDismiss: () => void;
@@ -84,21 +65,12 @@ type ConvertPromptProps = {
  *
  * The two cards alternate on each appearance rather than one being picked at
  * random — random repeats itself often enough to look broken.
- *
- * Deliberately an absolutely-positioned overlay rather than React Native's
- * Modal. On react-native-web, Modal portals its content into a div appended
- * to document.body — outside the #root container React attaches its
- * delegated listeners to — so no click inside it ever reaches React and
- * every control in the modal is inert. It renders and looks correct, which
- * is what makes it a trap. This is mounted from (tabs)/_layout so it still
- * covers the tab bar and the Catch button.
  */
 export function ConvertPrompt({ visible, onDismiss }: ConvertPromptProps) {
   const router = useRouter();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  // Null until the rotation has been read for this appearance, which is
-  // what stops the first card flashing up and being swapped for the second
-  // once storage answers.
+  // Null until the rotation has been read for this appearance, which is what
+  // stops the first card flashing up and being swapped for the second once
+  // storage answers.
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const wasVisible = useRef(false);
 
@@ -120,89 +92,19 @@ export function ConvertPrompt({ visible, onDismiss }: ConvertPromptProps) {
     };
   }, [visible]);
 
-  const handleJoin = () => {
-    onDismiss();
-    router.push('/join');
-  };
-
-  if (!visible || !prompt) return null;
-
-  // Fit by width first, then pull back if that makes it too tall for the
-  // screen. Doing it in this order keeps the card as large as it can be
-  // without ever running off the top and bottom.
-  let cardWidth = Math.min(windowWidth - Spacing.four * 2, MAX_WIDTH);
-  let cardHeight = cardWidth / prompt.ratio;
-  const maxHeight = windowHeight * MAX_HEIGHT_FRACTION;
-  if (cardHeight > maxHeight) {
-    cardHeight = maxHeight;
-    cardWidth = cardHeight * prompt.ratio;
-  }
+  if (!prompt) return null;
 
   return (
-    <View style={styles.root}>
-      {/* Backdrop is a sibling of the card, not its parent. Nesting them
-       * would mean a tap on the card ran the backdrop's handler too — on
-       * react-native-web these are DOM clicks and they bubble — so tapping
-       * the X would dismiss *and* navigate. */}
-      <Pressable
-        style={StyleSheet.absoluteFill}
-        onPress={onDismiss}
-        accessibilityRole="button"
-        accessibilityLabel="Dismiss"
-      />
-
-      <View style={[styles.card, { width: cardWidth, height: cardHeight }]}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={handleJoin}
-          accessibilityRole="button"
-          accessibilityLabel={prompt.label}>
-          <Image source={prompt.source} style={styles.image} resizeMode="contain" />
-        </Pressable>
-
-        {/* Sits over the artwork's own X. A sibling of the join target for
-         * the same bubbling reason as the backdrop. */}
-        <Pressable
-          style={[
-            styles.closeHit,
-            { width: cardWidth * CLOSE_HIT_FRACTION, height: cardHeight * CLOSE_HIT_FRACTION },
-          ]}
-          onPress={onDismiss}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-        />
-      </View>
-    </View>
+    <OverlayCard
+      visible={visible}
+      onDismiss={onDismiss}
+      source={prompt.source}
+      ratio={prompt.ratio}
+      label={prompt.label}
+      onPress={() => {
+        onDismiss();
+        router.push('/join');
+      }}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    // Above the tab bar and the Catch button, which are its siblings in
-    // (tabs)/_layout and would otherwise paint over the scrim.
-    zIndex: 10,
-    // Pinned rather than themed: this sits over the app, and a light-mode
-    // scrim would leave the dark card floating on near-white.
-    backgroundColor: Colors.dark.overlay,
-  },
-  card: {
-    borderRadius: Radii.lg,
-    overflow: 'hidden',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  closeHit: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-  },
-});

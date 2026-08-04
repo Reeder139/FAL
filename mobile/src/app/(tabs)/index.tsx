@@ -4,6 +4,7 @@ import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View }
 
 import { FeedTabs } from '@/components/feed-tabs';
 import { PostCard } from '@/components/post-card';
+import { useRulesPrompt } from '@/components/rules-prompt';
 import { SuggestedAnglersList } from '@/components/suggested-anglers';
 import { SuggestedFollowsRail } from '@/components/suggested-follows-rail';
 import { TabScreen } from '@/components/tab-screen';
@@ -24,6 +25,7 @@ import { useAuth } from '@/providers/auth-provider';
 export default function HomeScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { showRules } = useRulesPrompt();
   const { session } = useAuth();
   const [tab, setTab] = useState<FeedTab | null>(null);
   const [showLeagueTab, setShowLeagueTab] = useState(false);
@@ -110,6 +112,23 @@ export default function HomeScreen() {
             hitSlop={Spacing.two}>
             <Image source={require('@/assets/images/search-icon.png')} style={styles.searchIcon} />
           </Pressable>
+
+          {/* Centred on the row rather than placed in the flex flow. The tab
+           * pills' width changes with their labels and with whether My League
+           * is showing, so anything laid out between them and the search icon
+           * would sit centred in the leftover space, not on the row's middle.
+           * Absolute + left/right 0 pins it to the actual centre; it's after
+           * the other children so it takes taps where they overlap, and it
+           * only spans its own icon so it doesn't block the pills. */}
+          <View style={styles.rulesSlot} pointerEvents="box-none">
+            <Pressable
+              onPress={showRules}
+              accessibilityRole="button"
+              accessibilityLabel="The rules of the game"
+              hitSlop={Spacing.two}>
+              <Image source={require('@/assets/images/rules-icon.png')} style={styles.rulesIcon} />
+            </Pressable>
+          </View>
         </View>
       )}
 
@@ -179,6 +198,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   searchIcon: {
+    width: SearchIconSize,
+    height: SearchIconSize,
+  },
+  rulesSlot: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: Spacing.two,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rulesIcon: {
     width: SearchIconSize,
     height: SearchIconSize,
   },
