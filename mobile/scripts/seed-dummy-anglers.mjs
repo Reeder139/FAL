@@ -8,7 +8,12 @@
 // vars at invocation time only:
 //
 //   SUPABASE_URL=https://<ref>.supabase.co SUPABASE_SERVICE_ROLE_KEY=<key> \
-//     node scripts/seed-dummy-anglers.mjs [count]
+//     node scripts/seed-dummy-anglers.mjs [count] [startIndex]
+//
+// startIndex is 1-based and defaults to 1, so a second run has to be told
+// where the first one finished — `... 30 21` adds dummy21..dummy50. Usernames
+// are unique, so overlapping an existing range fails the whole account rather
+// than silently doing something odd.
 //
 // Dummy accounts are all tagged with the `dummy` username/email prefix so
 // they can be found and bulk-deleted later without touching real users:
@@ -21,6 +26,7 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const COUNT = parseInt(process.argv[2] ?? '20', 10);
+const START = parseInt(process.argv[3] ?? '1', 10);
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
   console.error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY env vars first.');
@@ -97,7 +103,11 @@ async function main() {
   if (venueErr) throw venueErr;
   const venueIds = (venues ?? []).map((v) => v.id);
 
-  console.log(`Seeding ${COUNT} dummy anglers into "${season.name}" (${divisions.length} divisions)...`);
+  console.log(
+    `Seeding ${COUNT} dummy anglers (dummy${String(START).padStart(2, '0')}..` +
+      `dummy${String(START + COUNT - 1).padStart(2, '0')}) into "${season.name}" ` +
+      `(${divisions.length} divisions)...`
+  );
 
   // Distribute PBs round-robin across divisions so every division gets
   // roughly equal coverage, with the actual weight randomized within range.
@@ -108,7 +118,7 @@ async function main() {
     const maxLb = division.max_pb_oz !== null ? Math.floor(division.max_pb_oz / 16) : 55;
     const pbOz = randomWeightOz(minLb, maxLb);
 
-    const n = String(i + 1).padStart(2, '0');
+    const n = String(START + i).padStart(2, '0');
     const username = `dummy${n}`;
     const displayName = `${pick(FIRST_NAMES)} ${pick(LAST_INITIALS).toUpperCase()}`;
     const email = `dummy${n}@fal-test.dev`;
