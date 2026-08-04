@@ -12,6 +12,7 @@ import {
   BottomTabInset,
   ButtonVariants,
   MaxContentWidth,
+  RulesIconSize,
   SearchIconSize,
   Spacing,
   Typography,
@@ -100,11 +101,26 @@ export default function HomeScreen() {
       {tab && (
         <View style={styles.tabsWrapper}>
           <FeedTabs value={tab} onChange={handleTabChange} showLeagueTab={showLeagueTab} />
-          {/* Right-aligned on the tabs' own row: the tab pills size to their
-           * labels, so the spacer between them and the icon is what pins the
-           * icon to the edge rather than a fixed width that would drift as
-           * My League comes and goes. */}
+          {/* Rules sits centred in the space the pills leave, between them
+           * and the search icon — a spacer either side rather than absolute
+           * centring on the row.
+           *
+           * True row-centre isn't available: the pills run to x275 on a 390px
+           * phone with My League showing, and the row's midpoint is x195, so
+           * an icon centred on the row lands on top of that pill and takes
+           * its taps. Equal spacers put it in the middle of the gap, which is
+           * where "between the tabs and search" actually reads, and it can
+           * never collide however the pills resize. */}
           <View style={styles.headerSpacer} />
+          <Pressable
+            onPress={showRules}
+            accessibilityRole="button"
+            accessibilityLabel="The rules of the game"
+            hitSlop={Spacing.two}>
+            <Image source={require('@/assets/images/rules-icon.png')} style={styles.rulesIcon} />
+          </Pressable>
+          <View style={styles.headerSpacer} />
+
           <Pressable
             onPress={() => router.push('/search-anglers')}
             accessibilityRole="button"
@@ -112,23 +128,6 @@ export default function HomeScreen() {
             hitSlop={Spacing.two}>
             <Image source={require('@/assets/images/search-icon.png')} style={styles.searchIcon} />
           </Pressable>
-
-          {/* Centred on the row rather than placed in the flex flow. The tab
-           * pills' width changes with their labels and with whether My League
-           * is showing, so anything laid out between them and the search icon
-           * would sit centred in the leftover space, not on the row's middle.
-           * Absolute + left/right 0 pins it to the actual centre; it's after
-           * the other children so it takes taps where they overlap, and it
-           * only spans its own icon so it doesn't block the pills. */}
-          <View style={styles.rulesSlot} pointerEvents="box-none">
-            <Pressable
-              onPress={showRules}
-              accessibilityRole="button"
-              accessibilityLabel="The rules of the game"
-              hitSlop={Spacing.two}>
-              <Image source={require('@/assets/images/rules-icon.png')} style={styles.rulesIcon} />
-            </Pressable>
-          </View>
         </View>
       )}
 
@@ -201,18 +200,9 @@ const styles = StyleSheet.create({
     width: SearchIconSize,
     height: SearchIconSize,
   },
-  rulesSlot: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: Spacing.two,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   rulesIcon: {
-    width: SearchIconSize,
-    height: SearchIconSize,
+    width: RulesIconSize,
+    height: RulesIconSize,
   },
   loading: {
     marginTop: Spacing.six,

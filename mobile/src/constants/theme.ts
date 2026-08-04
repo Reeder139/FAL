@@ -410,6 +410,14 @@ export const LeagueStripTextMinWidth = 208;
  * the pills' height (bodySmall on ButtonVariants' tab padding) so the row
  * reads as one band rather than the icon setting its own height. */
 export const SearchIconSize = 28;
+/** Rules icon, on the same row as the search icon but deliberately larger —
+ * it opens the one screen explaining how the whole game works, so it earns
+ * more weight than a search affordance.
+ *
+ * Bounded by the gap between the tab pills and the search icon, which is
+ * only ~41px on a 360px phone with My League showing. 36 leaves a couple of
+ * px either side there and a comfortable margin at 390 and up. */
+export const RulesIconSize = 36;
 /** Bottom nav bar icons. Bounded by width, not height: the bar splits into
  * two equal halves either side of the Catch button (it has to; see
  * app-tabs.web.tsx), and four tabs divide 2/2, giving ~62px per tab on a
