@@ -29,13 +29,16 @@ function Card({ card, onDismiss }: { card: SuggestedFollowCard; onDismiss: (id: 
   return (
     <View style={styles.card}>
       {/* The avatar is the item now — no card chrome behind it, so the
-       * circles read as a row of faces rather than a row of tiles. */}
+       * circles read as a row of faces rather than a row of tiles. The gold
+       * ring is what gives them an edge without card chrome: at this size a
+       * hairline in `border` all but vanishes against the background, and
+       * anglers with no avatar yet would be near-invisible discs. */}
       <View style={styles.avatarWrap}>
         {card.avatarUrl ? (
-          <Image source={{ uri: card.avatarUrl }} style={[styles.avatar, { borderColor: theme.border }]} />
+          <Image source={{ uri: card.avatarUrl }} style={[styles.avatar, { borderColor: theme.gold }]} />
         ) : (
           <View
-            style={[styles.avatar, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}
+            style={[styles.avatar, { backgroundColor: theme.surfaceElevated, borderColor: theme.gold }]}
           />
         )}
         <Pressable
