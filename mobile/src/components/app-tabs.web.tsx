@@ -110,7 +110,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     width: '100%',
-    padding: Spacing.three,
+    // No padding underneath, so the bar's bottom edge meets the bottom of
+    // the screen instead of hovering above it. The horizontal inset stays —
+    // that's what keeps the bar a centred pill rather than full-bleed.
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
+    paddingBottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',

@@ -8,8 +8,13 @@ import { useTheme } from '@/hooks/use-theme';
 export const FAB_SIZE = Spacing.six;
 /** How far the FAB's bottom sits above the screen edge — tuned per
  * platform since the native tab bar's real height isn't something this
- * app controls directly (OS-rendered), unlike the custom web tab bar. */
-const FAB_BOTTOM = Platform.select({ web: Spacing.five, default: BottomTabInset });
+ * app controls directly (OS-rendered), unlike the custom web tab bar.
+ *
+ * On web this tracks the tab bar: the bar sits flush to the bottom of the
+ * screen, and this value is what leaves the FAB overhanging its top edge by
+ * the same amount it always has. Move the bar and this has to move with it,
+ * or the FAB floats free of it. */
+const FAB_BOTTOM = Platform.select({ web: Spacing.three, default: BottomTabInset });
 
 export function CatchFab() {
   const theme = useTheme();

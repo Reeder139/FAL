@@ -204,11 +204,17 @@ and full opacity against 0.65 for the rest. The icons are full-colour gold,
 so a "muted" color token would fight the artwork — opacity is what dims them
 without recolouring.
 
-Bar depth is 68px of visible bar inside a 100px footprint (the outer
-`Spacing.three` padding sits either side of it), up from 50/82 when the bar
-held two-line text labels. Depth is derived, not chosen: it's the icon plus
-the button and container padding, so `NavIconSize` is the only number to
-change if the bar should be deeper or shallower.
+The bar sits flush to the bottom of the screen — no padding underneath it —
+while keeping its horizontal inset, so it reads as a centred pill anchored to
+the bottom edge rather than a floating one. The Catch FAB's `bottom` offset
+tracks this: it's set so the FAB overhangs the bar's top edge by 12px, and
+moving the bar without moving the FAB leaves it floating free of the bar.
+
+Bar depth is 68px of visible bar inside an 84px footprint (the outer
+`Spacing.three` padding is above it only), up from 50px of bar when it held
+two-line text labels. Depth is derived, not chosen: it's the icon plus the
+button and container padding, so `NavIconSize` is the only number to change
+if the bar should be deeper or shallower.
 
 **What caps the icon size.** The bar splits into two equal halves either side
 of the Catch button, and the left half holds 2 tabs against the right's 3 —
