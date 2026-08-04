@@ -49,27 +49,29 @@ export function LeagueStrip({ summary }: LeagueStripProps) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.primary, borderColor: theme.primary }]}>
-      <View style={styles.textGroup}>
-        {/* The standings area and the join link go to different places, so
-         * they're separate targets rather than one Pressable wrapping the
-         * whole strip. */}
-        <Pressable onPress={() => router.push('/divisions')}>
-          <Text style={[Typography.label, { color: theme.onPrimaryStrong }]}>
-            Your Current League Position
-          </Text>
-          <Text style={[Typography.bodySmall, styles.summaryLine, { color: theme.onPrimaryStrong }]} numberOfLines={1}>
-            {summaryText(summary)}
+      {/* The standings area and the join link go to different places, so
+       * they're separate targets rather than one Pressable wrapping the
+       * whole strip. They sit side by side, splitting the row. */}
+      <Pressable onPress={() => router.push('/divisions')} style={styles.textGroup}>
+        <Text style={[Typography.label, { color: theme.onPrimaryStrong }]}>
+          Your Current League Position
+        </Text>
+        {/* Two lines rather than one: sharing the row with the join prompt
+         * leaves too little width to fit the standings on a single line,
+         * and truncating the position defeats the point of the strip. */}
+        <Text style={[Typography.bodySmall, styles.summaryLine, { color: theme.onPrimaryStrong }]} numberOfLines={2}>
+          {summaryText(summary)}
+        </Text>
+      </Pressable>
+
+      {showJoinPrompt && (
+        <Pressable onPress={() => router.push('/join')} style={styles.joinRow} hitSlop={Spacing.one}>
+          <Text style={[Typography.caption, styles.joinLink, { color: theme.onPrimaryStrong }]}>
+            Join The League to win £20,000 Grand prize
           </Text>
         </Pressable>
+      )}
 
-        {showJoinPrompt && (
-          <Pressable onPress={() => router.push('/join')} style={styles.joinRow} hitSlop={Spacing.one}>
-            <Text style={[Typography.bodySmall, styles.joinLink, { color: theme.onPrimaryStrong }]}>
-              Join The League to win £20,000 Grand prize
-            </Text>
-          </Pressable>
-        )}
-      </View>
       <Image source={require('@/assets/images/logo.jpg')} style={styles.logo} />
     </View>
   );
@@ -87,14 +89,17 @@ const styles = StyleSheet.create({
     borderRadius: Radii.xs,
   },
   textGroup: {
+    // Even split with the join prompt beside it — both wrap rather than
+    // either one truncating.
     flex: 1,
   },
   summaryLine: {
     marginTop: Spacing.half,
   },
   joinRow: {
-    // The gap that separates the prompt from the standings above it.
-    marginTop: Spacing.two,
+    // Takes the leftover width. The container's own `gap` is what
+    // separates it from the standings.
+    flex: 1,
   },
   joinLink: {
     fontWeight: '700',
