@@ -1,23 +1,21 @@
 // Prepares the bottom nav bar's icons from the source art in
-// <repo>/Images/NAV icons/.
+// <repo>/Images/nav icons new/.
 //
-// Each source is a 768x768 canvas holding two separate things: the glyph,
-// and the tab's name baked in underneath it as artwork (a 68px-tall caption
-// at y675-742 in every file). Only the glyph survives this script.
+// Each source is a 768x768 canvas with the symbol floating small in the
+// middle of it — between 198 and 274px of actual ink, so roughly a third of
+// the frame. Shipping the canvas whole would mean the bar renders mostly
+// empty space and the symbol comes out about a third of its intended size.
 //
-// The caption has to go because it cannot physically work at tab size. Five
-// tabs plus the raised Catch button leave roughly 47px of width each at
-// phone width, and the caption is 68/768 of the canvas height — about 4px
-// tall once scaled to fit. Making it legible (~9px) would need the icon to
-// be over 100px wide, more than double the space a tab has. The tab names
-// live on as accessibility labels instead, so screen readers still announce
-// them.
+// So each is cropped to its own ink and padded back to a common square. The
+// padding matters as much as the crop: the symbols range from 0.98 to 1.26
+// in aspect, and squaring them at a shared size is what stops the podium
+// (widest) out-weighing the profile ring (tallest) once they sit side by
+// side at identical box sizes.
 //
-// The glyphs aren't uniform — they range from 0.80 to 1.11 in aspect and
-// occupy different fractions of their canvas — so each is cropped to its own
-// ink and padded back to a common square. Without that, the podium (wide)
-// would out-weigh the feed page (tall) in the bar even at identical box
-// sizes.
+// An earlier set of this artwork had each tab's name baked in underneath the
+// symbol, which this script cropped off. These replacements are symbol-only,
+// so there's nothing to strip — but the nav bar is still icon-only, and the
+// tab names still live on as accessibility labels rather than as pixels.
 //
 // Run from mobile/:  node scripts/prepare-nav-icons.mjs
 // Requires sharp:    npm install --no-save sharp
@@ -30,28 +28,24 @@ import path from 'node:path';
 
 import sharp from 'sharp';
 
-const SRC_DIR = path.resolve('..', 'Images', 'NAV icons');
+const SRC_DIR = path.resolve('..', 'Images', 'nav icons new');
 const OUT_DIR = path.resolve('assets', 'images', 'nav');
 
 /** Source file -> bundled name. The numeric prefixes are the nav order. */
 const ICONS = [
-  ['01_feed.png', 'feed.png'],
-  ['02_national_league.png', 'national-league.png'],
-  ['03_divisions.png', 'divisions.png'],
-  ['04_leaders.png', 'leaders.png'],
-  ['05_profile.png', 'profile.png'],
+  ['01_feed_symbol.png', 'feed.png'],
+  ['02_national_league_symbol.png', 'national-league.png'],
+  ['03_divisions_symbol.png', 'divisions.png'],
+  ['04_leaders_symbol.png', 'leaders.png'],
+  ['05_profile_symbol.png', 'profile.png'],
 ];
 
 /** Alpha at or below this counts as empty canvas. Low, so the crop keeps
- * each glyph's antialiased edge and drop shadow. */
+ * each symbol's antialiased edge, glow and drop shadow. */
 const ALPHA_FLOOR = 16;
 /** Bundled size. The bar renders these at NavIconSize (32), so this is 4x
  * for the densest screens. */
 const TARGET_SIZE = 128;
-/** Rows below this fraction of the canvas are the baked caption, not the
- * glyph. The caption sits at y675-742 of 768 in every source, so anything
- * past ~85% is the word; the glyphs all end by y607. */
-const CAPTION_CUTOFF = 0.85;
 
 const kb = (bytes) => `${(bytes / 1024).toFixed(0)}KB`;
 
@@ -59,13 +53,12 @@ async function prepare(srcName, outName) {
   const src = path.join(SRC_DIR, srcName);
   const { data, info } = await sharp(src).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width: w, height: h, channels } = info;
-  const limit = Math.floor(h * CAPTION_CUTOFF);
 
   let minX = w;
   let minY = h;
   let maxX = -1;
   let maxY = -1;
-  for (let y = 0; y < limit; y++) {
+  for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       if (data[(y * w + x) * channels + 3] <= ALPHA_FLOOR) continue;
       if (x < minX) minX = x;
@@ -74,7 +67,7 @@ async function prepare(srcName, outName) {
       if (y > maxY) maxY = y;
     }
   }
-  if (maxX < 0) throw new Error(`${src}: no glyph above alpha ${ALPHA_FLOOR} before row ${limit}`);
+  if (maxX < 0) throw new Error(`${src}: nothing above alpha ${ALPHA_FLOOR}`);
 
   const cropW = maxX - minX + 1;
   const cropH = maxY - minY + 1;
@@ -94,7 +87,7 @@ async function prepare(srcName, outName) {
   const before = (await stat(src)).size;
   const after = (await stat(out)).size;
   console.log(
-    `  ${srcName.padEnd(24)} glyph ${String(cropW).padStart(3)}x${String(cropH).padStart(3)}` +
+    `  ${srcName.padEnd(31)} ink ${String(cropW).padStart(3)}x${String(cropH).padStart(3)}` +
       ` (ratio ${(cropW / cropH).toFixed(2)})  ->  ${outName.padEnd(20)} ${kb(before)} -> ${kb(after)}`
   );
 }

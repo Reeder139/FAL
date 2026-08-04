@@ -183,15 +183,21 @@ Don't invent new division colors per screen — always pull `divisionOne` /
 ### Bottom nav bar
 
 The bar is icon-only: the artwork replaced the text labels entirely, so each
-tab's name survives only as an accessibility label. The source art ships each
-name baked in underneath its glyph, and `scripts/prepare-nav-icons.mjs` crops
-that caption off — five tabs plus the raised Catch button leave ~56px of
-width per tab, at which the caption would render about 4px tall.
+tab's name survives only as an accessibility label. Five tabs plus the raised
+Catch button leave ~56px of width per tab, which is the constraint everything
+here is sized against.
 
-Glyphs are cropped to their own ink and padded back to a common square,
-because the sources vary from 0.80 to 1.11 in aspect and fill different
-fractions of their canvas. Without that the podium would out-weigh the feed
-page in the bar at identical box sizes.
+`scripts/prepare-nav-icons.mjs` crops each symbol to its own ink and pads it
+back to a common square. Both halves matter: the sources float the symbol in
+the middle of a 768px canvas using only ~200–274px of it, so uncropped the
+bar would render mostly empty space; and they range from 0.98 to 1.26 in
+aspect, so squaring them at a shared size is what stops the podium (widest)
+out-weighing the profile ring (tallest) side by side at identical box sizes.
+
+An earlier version of this artwork had each tab's name baked in underneath
+the symbol, which the script also cropped off. The current sources are
+symbol-only, so there's nothing to strip — but the bar stays icon-only
+either way.
 
 The selected tab is shown two ways: the `backgroundSelected` pill behind it,
 and full opacity against 0.65 for the rest. The icons are full-colour gold,
