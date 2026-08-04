@@ -441,6 +441,18 @@ export const NavIconWide = { width: 54, height: 33 } as const;
  * where it used to be a 64px thumbnail in a left-aligned row and read as
  * incidental. Big enough to carry the trophy badge on its rim without the
  * two crowding each other. */
+/** Scrim laid over a photographic card backdrop so the text on top of it
+ * stays readable. The backdrops are already levelled to a common brightness
+ * by scripts/prepare-division-backdrops.mjs, so this only has to do the last
+ * bit of the work — enough to separate the text, not so much that the
+ * picture disappears. Not part of Colors: it's pinned to the dark palette
+ * because it sits on a darkened photo in both modes.
+ *
+ * 0.66 is measured, not guessed. Against the brightest patch of the harshest
+ * backdrop it puts white text at 7.4:1, clearing WCAG AAA; 0.58 left that
+ * one at 5.7:1, which passes AA body text but is thin for a heading over a
+ * photograph. Lower it and re-check the worst case before shipping. */
+export const CardBackdropScrim = 'rgba(7,13,20,0.66)';
 export const LeaderAvatarSize = 104;
 /** Trophy badge that sits on the leader avatar's rim. */
 export const LeaderBadgeSize = 34;
