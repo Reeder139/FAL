@@ -39,6 +39,573 @@ Casts (`$1::uuid`) are not optional — Retool sends everything as text.
 
 ---
 
+# Dashboard — build this as the landing page
+
+**Everything below is read-only.** No function calls, no writes, so none of it
+needs the `set_config` wrapper. It reads `private.*` views directly, which
+works because Retool connects as `postgres` over Postgres rather than through
+PostgREST — those views are not reachable from the app at all.
+
+> **This page must never be shared, screenshotted publicly, or shown to a
+> member.** Panel 6 is the fraud detection. The single most valuable property
+> of those checks is that anglers don't know what trips them; publish the
+> thresholds and people optimise around them, which is worse than having no
+> checks at all.
+
+Weights are integer ounces everywhere. Format at the edge:
+`weight_oz / 16 || ' lb ' || weight_oz % 16 || ' oz'`.
+
+Refresh: panels 1–5 on load and every 5 minutes. Panels 6–11 on demand or
+hourly — several scan the whole catch table and there is no reason to pay for
+that on every page view.
+
+**An empty dashboard is not a broken dashboard.** As of writing there are four
+accounts and zero catches, so most of panels 6–11 correctly return nothing.
+Build it anyway — the fraud panels are worth having in place *before* the data
+arrives, because the first time you need them is the first time someone has
+something to hide. Panel 8 is the exception: every row should read zero
+forever, and it should be zero right now.
+
+Before building, paste each query into the Supabase SQL Editor once with
+`explain` in front of it. `explain` resolves every table, column, function and
+type without executing anything, so a typo surfaces in a second rather than
+after the component is wired up.
+
+---
+
+## Panel 1 — Headline strip
+
+One row, six or seven stat tiles across the top. The numbers you glance at
+daily.
+
+```sql
+with s as (
+  select * from seasons where status = 'running' order by starts_on desc limit 1
+)
+select
+  (select count(*) from profiles where suspended_at is null)                     as anglers,
+  (select count(*) from profiles where created_at > now() - interval '7 days')   as new_this_week,
+  (select count(*) from catches)                                                 as catches_all_time,
+  (select count(*) from catches where created_at > now() - interval '7 days')    as catches_this_week,
+  (select count(*) from catches where status in ('pending','under_review'))      as awaiting_review,
+  (select count(*) from flags where resolved_at is null)                         as open_reports,
+  (select count(*) from venues where approved = false and merged_into is null)   as venues_pending,
+  (select count(*) from support_threads where status <> 'resolved')              as open_support,
+  (select coalesce(max(c.weight_oz), 0) from catches c, s
+     where c.status = 'verified'
+       and c.caught_at::date between s.starts_on and s.ends_on)                  as biggest_oz,
+  (select coalesce(sum(weight_oz), 0) from catches where status = 'verified')    as total_verified_oz;
+```
+
+`awaiting_review` and `open_reports` are the two that are actually actionable
+— give them a colour when non-zero.
+
+---
+
+## Panel 2 — The signup funnel
+
+The most useful thing on the page during beta. It tells you *where* people
+give up, which no single count can.
+
+```sql
+select
+  count(*)                                                             as registered,
+  count(*) filter (where fair_play_accepted_at is not null)             as accepted_code,
+  count(*) filter (where declared_pb_oz is not null)                    as declared_pb,
+  count(*) filter (where exists (
+    select 1 from posts po where po.author_id = p.id and po.deleted_at is null)) as posted_anything,
+  count(*) filter (where exists (
+    select 1 from catches c where c.angler_id = p.id))                  as logged_a_catch,
+  count(*) filter (where exists (
+    select 1 from season_entries se where se.angler_id = p.id))         as entered_a_season,
+  -- the drop that matters most: signed up, never logged a fish
+  count(*) filter (where not exists (
+    select 1 from catches c where c.angler_id = p.id))                  as never_logged_a_catch
+from profiles p;
+```
+
+A tester who accepted the Fair Play Code but never logged a catch got through
+onboarding and then stalled. That gap is the product problem worth chasing.
+
+---
+
+## Panel 3 — Activity, last 30 days
+
+Feed this to a line chart with `day` on the x-axis.
+
+```sql
+select
+  d::date as day,
+  (select count(*) from profiles where created_at::date = d::date)                        as signups,
+  (select count(*) from catches  where created_at::date = d::date)                        as catches,
+  (select count(*) from posts    where created_at::date = d::date and deleted_at is null) as posts,
+  (select count(*) from comments where created_at::date = d::date)                        as comments,
+  (select count(*) from likes    where created_at::date = d::date)                        as likes
+from generate_series(now() - interval '29 days', now(), interval '1 day') d
+order by day;
+```
+
+---
+
+## Panel 4 — Who is actually using it
+
+Activity means *doing* something, not opening the app — there is no analytics
+table, and posting, commenting and liking are the three things that leave a
+timestamp.
+
+```sql
+with activity as (
+  select author_id as angler_id, created_at from posts where deleted_at is null
+  union all
+  select author_id, created_at from comments
+  union all
+  select user_id,   created_at from likes
+)
+select
+  count(distinct angler_id) filter (where created_at > now() - interval '1 day')   as active_24h,
+  count(distinct angler_id) filter (where created_at > now() - interval '7 days')  as active_7d,
+  count(distinct angler_id) filter (where created_at > now() - interval '30 days') as active_30d
+from activity;
+```
+
+Retention — of anglers who have been here longer than a week, how many are
+still logging fish:
+
+```sql
+select
+  count(*)                                                    as cohort,
+  count(*) filter (where last_catch > now() - interval '7 days') as still_logging,
+  round(100.0 * count(*) filter (where last_catch > now() - interval '7 days')
+        / nullif(count(*), 0), 1)                             as pct_retained
+from (
+  select p.id, max(c.created_at) as last_catch
+  from profiles p
+  left join catches c on c.angler_id = p.id
+  where p.created_at < now() - interval '7 days'
+  group by p.id
+) x;
+```
+
+---
+
+## Panel 5 — Moderation load
+
+```sql
+select
+  count(*) filter (where status = 'pending')      as pending,
+  count(*) filter (where status = 'under_review') as under_review,
+  count(*) filter (where status = 'verified')     as verified,
+  count(*) filter (where status = 'rejected')     as rejected,
+  min(created_at) filter (where status in ('pending','under_review')) as oldest_unreviewed,
+  round(extract(epoch from (
+    now() - min(created_at) filter (where status in ('pending','under_review'))
+  )) / 3600.0, 1) as oldest_hours_waiting
+from catches;
+```
+
+How fast you actually respond. `is_system = false` excludes the automatic
+review `submit_catch` writes, so this measures *human* turnaround:
+
+```sql
+select
+  count(*) as reviewed,
+  round(percentile_cont(0.5) within group (
+    order by extract(epoch from (r.first_review - c.created_at)) / 3600.0)::numeric, 1) as median_hours,
+  round(percentile_cont(0.9) within group (
+    order by extract(epoch from (r.first_review - c.created_at)) / 3600.0)::numeric, 1) as p90_hours
+from catches c
+join lateral (
+  select min(cr.created_at) as first_review
+  from catch_reviews cr
+  where cr.catch_id = c.id and cr.is_system = false
+) r on r.first_review is not null;
+```
+
+What admins have been doing:
+
+```sql
+select action, count(*) as times, max(created_at) as last_used,
+       count(*) filter (where actor_id is null) as by_automation
+from admin_actions
+where created_at > now() - interval '30 days'
+group by action
+order by times desc;
+```
+
+---
+
+## Panel 6 — Fraud signals
+
+The reason the console exists. None of these prove anything on their own —
+they rank who is worth a look.
+
+### 6a. Terminal-digit distribution
+
+The single best signal in the app, and nearly free. Honest weights spread
+evenly across the sixteen ounce values, roughly **6.25% each**. Invented
+weights cluster on whole pounds and half pounds, so watch digits **0** and
+**8**. Render it as a bar chart — a fraudulent population is visible at a
+glance.
+
+```sql
+select
+  weight_oz % 16 as ounce_digit,
+  count(*)       as catches,
+  round(100.0 * count(*) / nullif(sum(count(*)) over (), 0), 1) as pct,
+  6.25           as expected_pct
+from catches
+group by 1
+order by 1;
+```
+
+### 6b. Which anglers are causing it
+
+Two digits out of sixteen should be about **12.5%** of anyone's fish. Sustained
+40%+ over a decent sample is worth a conversation.
+
+```sql
+select pr.username, o.n as catches, o.ends_zero, o.ends_eight,
+       o.pct_round_numbers, 12.5 as expected_pct
+from private.ounce_digit_profile o
+join profiles pr on pr.id = o.angler_id
+where o.n >= 5
+order by o.pct_round_numbers desc nulls last, o.n desc;
+```
+
+### 6c. Evidence quality
+
+```sql
+select
+  count(*)                                              as photos,
+  count(*) filter (where captured_in_app)               as taken_in_app,
+  round(100.0 * count(*) filter (where captured_in_app)
+        / nullif(count(*), 0), 1)                       as pct_in_app,
+  count(*) filter (where exif_taken_at is null)         as missing_exif_time,
+  count(*) filter (where exif_camera_make is null)      as missing_camera,
+  count(*) filter (where not public.is_phone_camera_make(exif_camera_make)) as not_a_phone
+from post_media;
+```
+
+`pct_in_app` is the number to watch over time. In-app capture is the only
+evidence that can't be a picture of someone else's fish, so if it trends
+towards zero the whole tier system is decorative.
+
+> **Read `not_a_phone` carefully.** `is_phone_camera_make(null)` returns
+> **true** — a missing camera make is not treated as suspicious, deliberately,
+> because plenty of phones strip it. So `not_a_phone` counts only photos that
+> named a camera the list doesn't recognise. Missing metadata is a separate
+> column, and `missing_exif_time` is the one `submit_catch` actually flags on.
+
+### 6d. What people are shooting with
+
+Same caveat: the `(none recorded)` row shows `accepted_as_phone = true`, which
+is honest about how the check behaves rather than a bug in the query.
+
+```sql
+select coalesce(exif_camera_make, '(none recorded)') as camera_make,
+       count(*) as photos,
+       public.is_phone_camera_make(exif_camera_make) as accepted_as_phone
+from post_media
+group by 1, 3
+order by photos desc;
+```
+
+### 6e. Photo taken nowhere near the claimed catch time
+
+`submit_catch` already flags a gap over 7 days. This lists them so you can see
+the size of the gap rather than just that one exists.
+
+```sql
+select pr.username, c.id as catch_id, c.weight_oz, c.status,
+       c.caught_at, m.exif_taken_at,
+       round(extract(epoch from (m.exif_taken_at - c.caught_at)) / 86400.0, 1) as gap_days
+from catches c
+join post_media m on m.post_id = c.post_id and m.exif_taken_at is not null
+join profiles pr on pr.id = c.angler_id
+where abs(extract(epoch from (m.exif_taken_at - c.caught_at))) > 7 * 86400
+order by abs(extract(epoch from (m.exif_taken_at - c.caught_at))) desc;
+```
+
+### 6f. Fish far bigger than the water has produced
+
+```sql
+select pr.username, v.name as venue, c.weight_oz, c.status,
+       round(d.p95_oz)::int as venue_p95_oz, d.max_oz as venue_best_oz, d.n as venue_catches
+from catches c
+join private.venue_distributions d on d.venue_id = c.venue_id
+join venues v   on v.id = c.venue_id
+join profiles pr on pr.id = c.angler_id
+where d.n >= 5
+  and c.weight_oz > d.p95_oz * 1.15
+order by c.weight_oz - d.p95_oz desc;
+```
+
+### 6g. The same weight, more than once
+
+Genuinely possible, and genuinely what someone does when they are making
+numbers up and forget which ones they used.
+
+```sql
+select pr.username,
+       c.weight_oz,
+       c.weight_oz / 16 || ' lb ' || c.weight_oz % 16 || ' oz' as weight,
+       count(*) as times,
+       min(c.caught_at)::date as first_claimed,
+       max(c.caught_at)::date as last_claimed
+from catches c
+join profiles pr on pr.id = c.angler_id
+group by pr.username, c.weight_oz
+having count(*) > 1
+order by count(*) desc, c.weight_oz desc;
+```
+
+### 6h. Fish that land suspiciously just over the qualifying line
+
+```sql
+with s as (select * from seasons where status = 'running' order by starts_on desc limit 1)
+select pr.username,
+       count(*) filter (where c.weight_oz between s.min_qualifying_oz
+                                             and s.min_qualifying_oz + 16) as just_over_line,
+       count(*) as total_catches
+from catches c
+cross join s
+join profiles pr on pr.id = c.angler_id
+group by pr.username
+having count(*) filter (where c.weight_oz between s.min_qualifying_oz
+                                              and s.min_qualifying_oz + 16) >= 2
+order by just_over_line desc;
+```
+
+### 6i. Possible duplicate accounts
+
+Postcode district only — the app never stores a full postcode.
+
+```sql
+select postcode_district,
+       count(*) as accounts,
+       string_agg(username, ', ' order by created_at) as anglers
+from profiles
+where postcode_district is not null
+group by postcode_district
+having count(*) > 1
+order by count(*) desc;
+```
+
+> **Not covered here:** the same fish photographed twice from slightly
+> different angles. `submit_catch` only rejects an *exact* perceptual-hash
+> match, so a re-crop or re-save sails through. Closing that needs Hamming
+> distance rather than equality — see `docs/same-fish-recognition-scope.md`.
+
+---
+
+## Panel 7 — League integrity
+
+Division balance. A division with two anglers in it is not a competition:
+
+```sql
+with s as (select * from seasons where status = 'running' order by starts_on desc limit 1)
+select d.rank, d.name,
+       d.min_pb_oz, d.max_pb_oz,
+       count(se.id)                                  as anglers,
+       count(se.id) filter (where se.tier = 'competitor') as paying,
+       count(se.id) filter (where se.prize_eligible)      as prize_eligible
+from s
+join divisions d on d.season_id = s.id
+left join season_entries se on se.division_id = d.id and se.left_at is null
+group by d.rank, d.name, d.min_pb_oz, d.max_pb_oz
+order by d.rank;
+```
+
+Is the scoring curve doing anything? If every division has the same spread,
+the PB banding isn't separating anyone:
+
+```sql
+select d.rank, d.name,
+       count(*)                                       as anglers,
+       round(min(lt.total_points), 1)                 as lowest,
+       round(percentile_cont(0.5) within group (order by lt.total_points)::numeric, 1) as median,
+       round(max(lt.total_points), 1)                 as highest,
+       round(avg(lt.counting_fish), 1)                as avg_counting_fish,
+       max(lt.best_fish_oz)                           as best_fish_oz
+from league_table lt
+join divisions d on d.id = lt.division_id
+group by d.rank, d.name
+order by d.rank;
+```
+
+**Verified fish that score nothing.** Every one of these is an angler who
+believes they are on the board and isn't:
+
+```sql
+with s as (select * from seasons where status = 'running' order by starts_on desc limit 1)
+select
+  count(*) filter (where c.weight_oz < s.min_qualifying_oz)                as below_qualifying_weight,
+  count(*) filter (where c.caught_at::date not between s.starts_on
+                                                   and s.ends_on)          as dated_outside_the_season,
+  count(*) filter (where not exists (
+    select 1 from season_entries se
+    where se.angler_id = c.angler_id and se.season_id = s.id))             as angler_not_entered
+from catches c
+cross join s
+where c.status = 'verified';
+```
+
+`dated_outside_the_season` is worth an alert. A live bug once put a catch in
+2014 off a camera-roll photo's EXIF date; it stayed verified and scored zero
+in silence. The app warns about this at entry now, but this is the backstop.
+
+---
+
+## Panel 8 — Things that should never be true
+
+A standing list of integrity checks. Every row should read zero. Anything
+non-zero is a bug, not a moderation decision.
+
+```sql
+select 'verified catch dated outside every season' as issue, count(*) as n
+  from catches c
+  where c.status = 'verified'
+    and not exists (select 1 from seasons s
+                    where c.caught_at::date between s.starts_on and s.ends_on)
+union all
+select 'catch post with no catch row', count(*)
+  from posts p
+  where p.kind = 'catch' and p.deleted_at is null
+    and not exists (select 1 from catches c where c.post_id = p.id)
+union all
+select 'catch with no photo at all', count(*)
+  from catches c
+  where not exists (select 1 from post_media m where m.post_id = c.post_id)
+union all
+select 'catch dated in the future', count(*)
+  from catches where caught_at > now()
+union all
+select 'profile has not accepted the Fair Play Code', count(*)
+  from profiles where fair_play_accepted_at is null
+union all
+select 'abandoned upload files in storage', count(*)
+  from private.orphaned_upload_objects
+union all
+select 'season entry using another season''s division', count(*)
+  from season_entries se
+  join divisions d on d.id = se.division_id
+  where d.season_id <> se.season_id
+union all
+select 'venue merged into itself', count(*)
+  from venues where merged_into = id
+union all
+select 'open report on a catch that no longer exists', count(*)
+  from flags f
+  where f.resolved_at is null
+    and not exists (select 1 from catches c where c.id = f.catch_id)
+order by n desc, issue;
+```
+
+---
+
+## Panel 9 — Venues
+
+```sql
+select v.name, v.county, v.water_type, v.approved,
+       count(c.id)                      as verified_catches,
+       count(distinct c.angler_id)      as anglers,
+       round(avg(c.weight_oz) / 16.0, 1) as avg_lb,
+       max(c.weight_oz)                 as biggest_oz
+from venues v
+left join catches c on c.venue_id = v.id and c.status = 'verified'
+where v.merged_into is null
+group by v.id, v.name, v.county, v.water_type, v.approved
+order by verified_catches desc, v.name;
+```
+
+Venues only one person has ever fished — either a genuinely private syndicate,
+or somewhere invented to host invented fish:
+
+```sql
+select v.name, v.approved,
+       count(*) as catches,
+       min(pr.username) as only_angler,
+       max(c.weight_oz) as biggest_oz
+from venues v
+join catches c   on c.venue_id = v.id
+join profiles pr on pr.id = c.angler_id
+where v.merged_into is null
+group by v.id, v.name, v.approved
+having count(distinct c.angler_id) = 1 and count(*) >= 3
+order by count(*) desc;
+```
+
+---
+
+## Panel 10 — Content and engagement
+
+```sql
+select kind,
+       count(*)                    as posts,
+       sum(like_count)             as likes,
+       sum(comment_count)          as comments,
+       round(avg(like_count), 1)   as avg_likes,
+       count(*) filter (where visibility <> 'public') as non_public
+from posts
+where deleted_at is null
+group by kind
+order by posts desc;
+```
+
+Best posts — useful for picking what to feature:
+
+```sql
+select pr.username, p.kind, left(coalesce(p.caption, ''), 60) as caption,
+       p.like_count, p.comment_count,
+       c.weight_oz, p.created_at
+from posts p
+join profiles pr on pr.id = p.author_id
+left join catches c on c.post_id = p.id
+where p.deleted_at is null
+order by p.like_count + p.comment_count * 2 desc
+limit 20;
+```
+
+Anglers who have never posted — the beta list worth chasing personally:
+
+```sql
+select pr.username, pr.display_name, pr.country, pr.created_at,
+       pr.follower_count, pr.fair_play_accepted_at is not null as accepted_code
+from profiles pr
+where not exists (select 1 from posts p where p.author_id = pr.id and p.deleted_at is null)
+order by pr.created_at desc;
+```
+
+---
+
+## Panel 11 — Storage
+
+```sql
+select count(*) as abandoned_files,
+       pg_size_pretty(coalesce(sum(size_bytes), 0)) as wasted_space,
+       min(created_at) as oldest
+from private.orphaned_upload_objects;
+```
+
+Should sit at or near zero — the app cleans up after a failed submission
+itself. A number that climbs means something is failing quietly. Clear them
+with the Storage API call from the purge flow above.
+
+```sql
+select round(avg(n), 2) as avg_photos_per_catch,
+       max(n)           as most_on_one_catch,
+       count(*) filter (where n = 1) as single_photo_catches,
+       count(*) filter (where n = 0) as no_photo_catches
+from (
+  select c.id, count(m.id) as n
+  from catches c
+  left join post_media m on m.post_id = c.post_id
+  group by c.id
+) x;
+```
+
+---
+
 ## Catch moderation
 
 Replaces any hand-written status update. `reason` is required: a moderation
