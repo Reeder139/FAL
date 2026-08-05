@@ -171,12 +171,21 @@ export async function fetchSuggestedAnglers(limit = 12): Promise<SuggestedAngler
   } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const [{ data: alreadyFollowing }, { data: season }] = await Promise.all([
+  const [{ data: alreadyFollowing }, { data: season }, { data: dismissed }] = await Promise.all([
     supabase.from('follows').select('followee_id').eq('follower_id', user.id),
     supabase.from('seasons').select('id').eq('status', 'running').limit(1).maybeSingle(),
+    // Dismissals belong here as much as in the rail's RPC. This list and the
+    // rail are two views of one idea — "anglers you might follow" — and a
+    // dismissal that only silenced one of them meant the same person kept
+    // reappearing under the other, which reads as the × not working.
+    supabase.from('follow_suggestion_dismissals').select('suggested_id').eq('user_id', user.id),
   ]);
 
-  const excludeIds = new Set<string>([user.id, ...(alreadyFollowing ?? []).map((f) => f.followee_id)]);
+  const excludeIds = new Set<string>([
+    user.id,
+    ...(alreadyFollowing ?? []).map((f) => f.followee_id),
+    ...(dismissed ?? []).map((d) => d.suggested_id),
+  ]);
   const suggestions: SuggestedAngler[] = [];
 
   if (season) {
