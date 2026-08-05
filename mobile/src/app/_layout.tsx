@@ -31,6 +31,10 @@ export default function RootLayout() {
           {/* Same reasoning as log-catch: a focused single-task flow you
             * finish and dismiss, not a page you browse. */}
           <Stack.Screen name="search-anglers" options={{ presentation: 'modal' }} />
+          {/* Outside (auth) on purpose — see the note in the screen. A
+            * recovery link creates a session, and (auth)'s layout redirects
+            * anyone holding one straight to the feed. */}
+          <Stack.Screen name="reset-password" />
         </Stack>
       </AuthProvider>
     </ThemeProvider>

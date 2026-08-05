@@ -27,7 +27,7 @@ export default function ForgotPasswordScreen() {
     // Whatever EXPO_PUBLIC_SITE_URL is set to MUST also be on Supabase's
     // redirect allow-list (Authentication -> URL Configuration), or it
     // rejects the link and reset stops working entirely.
-    const redirectTo = absoluteUrl('/login');
+    const redirectTo = absoluteUrl('/reset-password');
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(
       email.trim(),
       redirectTo ? { redirectTo } : undefined
