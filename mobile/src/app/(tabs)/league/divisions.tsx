@@ -1,26 +1,18 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type ImageSourcePropType,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { TabScreen } from '@/components/tab-screen';
 import {
   BottomTabInset,
-  CardBackdropScrim,
   Colors,
+  DivisionWash,
   MaxContentWidth,
   Radii,
   Spacing,
   Typography,
+  withAlpha,
 } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchLeagueOverview, formatPbRange, type DivisionOverview, type LeagueOverview } from '@/lib/divisions';
@@ -28,58 +20,25 @@ import { formatWeightOz } from '@/lib/units';
 
 const DIVISION_COLOR_KEYS = ['divisionOne', 'divisionTwo', 'divisionThree'] as const;
 
-/** Backdrops behind the division cards. Eight for three slots, so the page
- * doesn't look the same on every visit — see takeNextBackdropOffset. Built
- * by scripts/prepare-division-backdrops.mjs. */
-const BACKDROPS: ImageSourcePropType[] = [
-  require('@/assets/images/divisions/backdrop-01.jpg'),
-  require('@/assets/images/divisions/backdrop-02.jpg'),
-  require('@/assets/images/divisions/backdrop-03.jpg'),
-  require('@/assets/images/divisions/backdrop-04.jpg'),
-  require('@/assets/images/divisions/backdrop-05.jpg'),
-  require('@/assets/images/divisions/backdrop-06.jpg'),
-  require('@/assets/images/divisions/backdrop-07.jpg'),
-  require('@/assets/images/divisions/backdrop-08.jpg'),
-];
-
-const BACKDROP_KEY = 'fal.divisionBackdropOffset';
-
 /**
- * Where in the set this visit starts, advancing by three so the next visit
- * gets a fresh trio rather than two of the same.
+ * A card washed in its own division's colour.
  *
- * Persisted rather than random: random picks repeat often enough with eight
- * images that it reads as broken rather than varied, and an in-memory
- * counter would reset on every launch and show the same three each time.
- */
-async function takeNextBackdropOffset(): Promise<number> {
-  let offset = 0;
-  try {
-    const stored = await AsyncStorage.getItem(BACKDROP_KEY);
-    const parsed = stored === null ? 0 : Number.parseInt(stored, 10);
-    if (Number.isFinite(parsed) && parsed >= 0) offset = parsed % BACKDROPS.length;
-    await AsyncStorage.setItem(BACKDROP_KEY, String((offset + 3) % BACKDROPS.length));
-  } catch {
-    // Non-critical — worst case every visit opens on the same trio.
-  }
-  return offset;
-}
-
-/**
- * The card's own text sits on a photograph, so its colours are pinned to the
- * dark palette rather than following the theme. The backdrops are darkened
- * to a common level by the prep script, which makes white-on-photo right in
- * both modes — a light-mode scrim over an already-dark image would land on
- * mid-grey and leave the dark text with nothing to sit against.
+ * This used to sit on a photograph from a rotating set. The photos fought
+ * the text — every one had a different distribution of light, so a scrim
+ * dark enough for the worst of them flattened the rest, and the cards read
+ * as three unrelated pictures rather than three ranks of one thing. Colour
+ * does the job the photo was there for, and does it the same way every time.
+ *
+ * Colours stay pinned to the dark palette rather than following the theme:
+ * the wash is a saturated accent, and white is the only thing that reads on
+ * it in either mode.
  */
 function DivisionCard({
   division,
   index,
-  backdrop,
 }: {
   division: DivisionOverview;
   index: number;
-  backdrop: ImageSourcePropType;
 }) {
   const router = useRouter();
   const accent = Colors.dark[DIVISION_COLOR_KEYS[index % DIVISION_COLOR_KEYS.length]];
@@ -88,11 +47,15 @@ function DivisionCard({
     <Pressable
       onPress={() => router.push({ pathname: '/league/[id]', params: { id: division.id } })}
       style={[styles.card, { borderColor: accent }]}>
-      {/* Explicit width/height plus resizeMode rather than ImageBackground:
-       * on react-native-web ImageBackground never passes resizeMode down, so
-       * the picture renders at its natural size anchored top-left. */}
-      <Image source={backdrop} style={styles.backdrop} resizeMode="cover" />
-      <View style={styles.scrim} />
+      {/* Diagonal so the colour has somewhere to come from, and gone before
+        * the bottom of the card — the stats sit on plain dark surface, which
+        * is what keeps them legible without a scrim over the whole thing. */}
+      <LinearGradient
+        colors={[withAlpha(accent, DivisionWash.from), withAlpha(accent, DivisionWash.mid), 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.wash}
+      />
 
       <View style={styles.cardContent}>
         <View style={styles.cardHeader}>
@@ -133,15 +96,9 @@ export default function LeagueScreen() {
   const theme = useTheme();
   const [overview, setOverview] = useState<LeagueOverview | null>(null);
   const [loading, setLoading] = useState(true);
-  // Null until the rotation has been read, so the cards don't paint one trio
-  // of backdrops and swap to another the moment storage answers.
-  const [backdropOffset, setBackdropOffset] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    takeNextBackdropOffset().then((offset) => {
-      if (!cancelled) setBackdropOffset(offset);
-    });
     fetchLeagueOverview()
       .then((data) => {
         if (!cancelled) setOverview(data);
@@ -156,7 +113,7 @@ export default function LeagueScreen() {
 
   return (
     <TabScreen>
-      {loading || backdropOffset === null ? (
+      {loading ? (
         <ActivityIndicator color={theme.primary} style={styles.loading} />
       ) : !overview ? (
         <View style={styles.emptyState}>
@@ -186,7 +143,6 @@ export default function LeagueScreen() {
               key={division.id}
               division={division}
               index={index}
-              backdrop={BACKDROPS[(backdropOffset + index) % BACKDROPS.length]}
             />
           ))}
 
@@ -223,30 +179,21 @@ const styles = StyleSheet.create({
     paddingBottom: BottomTabInset + Spacing.four,
     gap: Spacing.three,
   },
-  backdrop: {
+  wash: {
     position: 'absolute',
     top: 0,
     left: 0,
-    // Explicit rather than absoluteFill: without a concrete size,
-    // react-native-web sizes the img from its intrinsic pixels instead of
-    // filling the card.
+    // Explicit rather than absoluteFill, same reason the photo needed it:
+    // react-native-web wants a concrete size here.
     width: '100%',
     height: '100%',
-  },
-  scrim: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: CardBackdropScrim,
   },
   cardContent: {
     gap: Spacing.three,
   },
   card: {
     borderRadius: Radii.lg,
-    // Keeps the backdrop inside the rounded corners.
+    // Keeps the wash inside the rounded corners.
     overflow: 'hidden',
     borderWidth: 1,
     padding: Spacing.four,

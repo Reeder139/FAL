@@ -254,6 +254,34 @@ export const Spacing = {
 // ---------------------------------------------------------------------------
 // RADII
 // ---------------------------------------------------------------------------
+/**
+ * A palette colour at partial opacity, as an rgba string.
+ *
+ * For tinting a surface with an accent that is defined once as a hex token —
+ * washing a division card in its own colour, say. Deliberately not a second
+ * set of "…Faded" tokens: the accent and its wash would then be two values
+ * that have to be kept in agreement, and they would eventually disagree.
+ *
+ * Returns the input untouched if it is not a 6-digit hex, so a caller that
+ * passes an already-rgba value degrades to no tint rather than to a broken
+ * colour string.
+ */
+export function withAlpha(hex: string, alpha: number): string {
+  const match = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!match) return hex;
+  const n = parseInt(match[1], 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+/** How a division card is washed in its own colour. Strongest at the top
+ * left, gone by the bottom, so the artwork-free card still has somewhere for
+ * the eye to enter — and so the stats along the bottom sit on plain dark
+ * surface rather than on colour, which is what keeps them readable. */
+export const DivisionWash = {
+  from: 0.5,
+  mid: 0.16,
+} as const;
+
 export const Radii = {
   /** Small chips, rank badges */
   xs: 6,
@@ -491,18 +519,6 @@ export const WelcomeArtMaxWidth = { logo: 214, button: 200 } as const;
  * where it used to be a 64px thumbnail in a left-aligned row and read as
  * incidental. Big enough to carry the trophy badge on its rim without the
  * two crowding each other. */
-/** Scrim laid over a photographic card backdrop so the text on top of it
- * stays readable. The backdrops are already levelled to a common brightness
- * by scripts/prepare-division-backdrops.mjs, so this only has to do the last
- * bit of the work — enough to separate the text, not so much that the
- * picture disappears. Not part of Colors: it's pinned to the dark palette
- * because it sits on a darkened photo in both modes.
- *
- * 0.66 is measured, not guessed. Against the brightest patch of the harshest
- * backdrop it puts white text at 7.4:1, clearing WCAG AAA; 0.58 left that
- * one at 5.7:1, which passes AA body text but is thin for a heading over a
- * photograph. Lower it and re-check the worst case before shipping. */
-export const CardBackdropScrim = 'rgba(7,13,20,0.66)';
 export const LeaderAvatarSize = 104;
 /** Trophy badge that sits on the leader avatar's rim. */
 export const LeaderBadgeSize = 34;
