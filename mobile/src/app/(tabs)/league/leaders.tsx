@@ -1,16 +1,19 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { TabScreen } from '@/components/tab-screen';
 import {
   BottomTabInset,
+  DivisionWash,
   LeaderAvatarSize,
   LeaderBadgeSize,
   MaxContentWidth,
   Radii,
   Spacing,
   Typography,
+  withAlpha,
 } from '@/constants/theme';
 import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
@@ -36,6 +39,16 @@ function LeaderCard({ division, index }: { division: DivisionLeaderRow; index: n
 
   return (
     <View style={[styles.card, { backgroundColor: theme.surface, borderColor: accent }]}>
+      {/* Same wash as the divisions cards, so the two screens read as one
+        * thing seen twice rather than two designs. Diagonal, and gone before
+        * the stats row, which sits on plain dark surface. */}
+      <LinearGradient
+        colors={[withAlpha(accent, DivisionWash.from), withAlpha(accent, DivisionWash.mid), 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.wash}
+      />
+
       {/* Division identity only. The trophy used to sit here as a badge on
        * the left; it's moved onto the avatar's rim, which is both where it
        * belongs (it marks the angler, not the division) and what frees this
@@ -215,6 +228,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: Spacing.four,
     gap: Spacing.three,
+    // Keeps the wash inside the rounded corners.
+    overflow: 'hidden',
+  },
+  wash: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    // Concrete size rather than absoluteFill — react-native-web wants one.
+    width: '100%',
+    height: '100%',
   },
   cardHeader: {
     flexDirection: 'row',
