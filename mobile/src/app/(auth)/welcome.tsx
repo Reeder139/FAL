@@ -3,7 +3,7 @@ import type { ImageSourcePropType, StyleProp, ViewStyle } from 'react-native';
 import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Colors, MaxContentWidth, Radii, Spacing } from '@/constants/theme';
+import { Colors, MaxContentWidth, Radii, Spacing, WelcomeArtMaxWidth } from '@/constants/theme';
 
 /**
  * Branded landing screen — the first thing a signed-out angler sees. The
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     // width it would eat most of the screen. This cap is also what keeps
     // the whole screen inside a typical phone viewport without scrolling —
     // it's the tallest element, so it's the one worth constraining.
-    maxWidth: 230,
+    maxWidth: WelcomeArtMaxWidth.logo,
     alignSelf: 'center',
   },
   tagline: {
@@ -193,6 +193,12 @@ const styles = StyleSheet.create({
   },
   buttonPressable: {
     width: '100%',
+    // Narrower than the column, and centred. The art is 4:1, so this is the
+    // cheapest vertical space on the screen: the two buttons together give
+    // back four times what a single one would, which is what gets a short
+    // phone under the fold line without touching the logo or the prize box.
+    maxWidth: WelcomeArtMaxWidth.button,
+    alignSelf: 'center',
     borderRadius: Radii.md,
   },
   pressed: {

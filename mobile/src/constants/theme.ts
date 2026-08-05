@@ -461,6 +461,18 @@ export const NavIconWide = { width: 54, height: 33 } as const;
  * — the bar takes its row height from its tallest child, so a taller divider
  * would silently deepen the whole bar. */
 export const NavDividerSize = { width: 1, height: 30 } as const;
+/** Caps on the welcome screen's artwork, which is otherwise width-driven.
+ *
+ * Both exist for the same reason: that screen must fit without scrolling,
+ * and every one of its elements is art whose height is its width over a
+ * fixed ratio — so the only way to buy vertical space is to stop something
+ * being as wide as the column.
+ *
+ * `button` is the tighter constraint of the two. The buttons are 4:1, so a
+ * pixel off their width is only a quarter-pixel off their height, and there
+ * are two of them. Do not take it below 176: at 4:1 that is a 44px tall
+ * target, the minimum a finger can reliably hit. */
+export const WelcomeArtMaxWidth = { logo: 214, button: 200 } as const;
 /** The division leader's avatar on the Leaders page. Sized to be the thing
  * the eye lands on first in its card — it's the whole point of that screen,
  * where it used to be a 64px thumbnail in a left-aligned row and read as
