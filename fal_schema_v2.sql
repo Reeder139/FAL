@@ -3040,3 +3040,150 @@ end; $$;
 
 revoke all on function public.resolve_catch_flags(uuid, text) from public, anon;
 grant execute on function public.resolve_catch_flags(uuid, text) to authenticated, service_role;
+
+-- ===========================================================================
+-- The audit trail must not stop a user being deleted.
+--
+-- admin_actions.actor_id references profiles with no on-delete behaviour, so
+-- the default applies: deleting a profile that ever performed an admin action
+-- fails on the foreign key. And admin_actions is append-only — a trigger
+-- refuses UPDATE and DELETE even for service_role — so the reference cannot
+-- be cleared or the row removed to get out of the way.
+--
+-- Together that means anyone who has ever touched the console can never be
+-- deleted. That is not a safeguard, it is a deadlock, and it would eventually
+-- collide with a real erasure request rather than a test account.
+--
+-- ON DELETE SET NULL: the record of what happened survives, the pointer to a
+-- row that no longer exists does not. Which is the right way round — an audit
+-- entry is evidence of an action, and it should outlive the account that
+-- performed it.
+-- ===========================================================================
+
+alter table admin_actions
+  drop constraint if exists admin_actions_actor_id_fkey;
+
+alter table admin_actions
+  add constraint admin_actions_actor_id_fkey
+  foreign key (actor_id) references profiles(id) on delete set null;
+
+-- ---------------------------------------------------------------------------
+-- Keep the attribution when the pointer goes.
+--
+-- SET NULL costs the audit row its actor, and for a row whose detail carries
+-- no `operator` (a signed-in admin acting through the app rather than the
+-- console) that would leave nothing at all. So the username is copied into
+-- the detail at write time, where it is a value rather than a reference and
+-- cannot be nulled by a later deletion.
+-- ---------------------------------------------------------------------------
+create or replace function private.admin_audit(
+  p_action       text,
+  p_target_table text,
+  p_target_id    uuid,
+  p_detail       jsonb default '{}'::jsonb
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_jwt_role  text := coalesce(auth.role(), '');
+  -- session_user, NOT current_user: inside SECURITY DEFINER current_user is
+  -- the owner, which once made this gate pass for everybody. See
+  -- 20260805040000.
+  v_conn_role text := session_user;
+  v_operator  text := nullif(current_setting('app.admin_actor', true), '');
+  v_actor     uuid := auth.uid();
+  v_username  text;
+  v_detail    jsonb := coalesce(p_detail, '{}'::jsonb);
+begin
+  if v_jwt_role <> 'service_role'
+     and v_conn_role not in ('postgres', 'service_role', 'supabase_admin')
+     and not public.is_admin() then
+    raise exception 'admin privileges required' using errcode = '42501';
+  end if;
+
+  if v_actor is not null then
+    select p.username into v_username from profiles p where p.id = v_actor;
+  end if;
+
+  v_detail := v_detail || jsonb_build_object(
+    'conn_role', v_conn_role,
+    'jwt_role', nullif(v_jwt_role, '')
+  );
+  if v_operator is not null then
+    v_detail := v_detail || jsonb_build_object('operator', v_operator);
+  end if;
+  if v_username is not null then
+    v_detail := v_detail || jsonb_build_object('actor_username', v_username);
+  end if;
+
+  insert into admin_actions (actor_id, action, target_table, target_id, detail)
+  values (v_actor, p_action, p_target_table, p_target_id, v_detail);
+end; $$;
+
+-- ===========================================================================
+-- Two more places where deleting a user was impossible.
+--
+-- 20260805100000 gave admin_actions.actor_id ON DELETE SET NULL so the audit
+-- trail would stop blocking user deletion. It did not work, and the reason is
+-- worth writing down: SET NULL is an UPDATE, and the append-only trigger
+-- refuses every UPDATE. The guard blocked the fix for the problem the guard
+-- created.
+-- ===========================================================================
+
+-- ---------------------------------------------------------------------------
+-- 1. Let the trigger through for exactly one transition.
+--
+-- actor_id going from set to null, with every other column identical — which
+-- is precisely what the foreign key does when the actor is deleted, and
+-- nothing else. Rewriting an action, a target or a detail is still refused,
+-- as is deleting the row outright.
+--
+-- Written as an explicit comparison of every column rather than "if only
+-- actor_id changed", so a column added later is not silently editable: a new
+-- column would not appear in this list, the comparison would not match, and
+-- the update would be refused. Failing closed is the right default for an
+-- audit table.
+-- ---------------------------------------------------------------------------
+create or replace function private.admin_actions_are_append_only()
+returns trigger
+language plpgsql as $$
+begin
+  if tg_op = 'UPDATE'
+     and old.actor_id is not null
+     and new.actor_id is null
+     and new.id           =            old.id
+     and new.action       =            old.action
+     and new.target_table =            old.target_table
+     and new.target_id    is not distinct from old.target_id
+     and new.detail       =            old.detail
+     and new.created_at   =            old.created_at
+  then
+    -- The actor's account has been deleted. The record of what they did
+    -- stays; only the pointer to a row that no longer exists goes. The
+    -- username was copied into `detail` when the row was written, so the
+    -- attribution survives this.
+    return new;
+  end if;
+
+  raise exception 'admin_actions is append-only; % is not permitted', tg_op;
+end; $$;
+
+-- ---------------------------------------------------------------------------
+-- 2. support_messages.author_id likewise.
+--
+-- A message is a record of something said. It should not keep an account
+-- alive, and deleting the account should not delete the conversation the rest
+-- of the thread depends on to make sense.
+--
+-- Null already means "the FAL team" in the member-facing view, which is not
+-- quite right for a departed member's own message — but those live on the
+-- member's own thread, and that cascades away with them, so in practice this
+-- only fires for messages on someone else's thread, which a member cannot
+-- write.
+-- ---------------------------------------------------------------------------
+alter table support_messages
+  drop constraint if exists support_messages_author_id_fkey;
+
+alter table support_messages
+  add constraint support_messages_author_id_fkey
+  foreign key (author_id) references profiles(id) on delete set null;
