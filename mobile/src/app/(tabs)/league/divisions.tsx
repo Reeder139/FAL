@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -93,6 +94,7 @@ function DivisionCard({
 
 export default function LeagueScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const [overview, setOverview] = useState<LeagueOverview | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -112,11 +114,27 @@ export default function LeagueScreen() {
 
   return (
     <TabScreen>
+      {/* Outside the loading/empty/loaded branches on purpose: the way back
+        * should not depend on whether a season happens to be open, and the
+        * title was otherwise written out twice and could drift. */}
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => router.navigate('/league')}
+          style={[styles.backButton, { backgroundColor: theme.surface }]}
+          hitSlop={Spacing.two}
+          accessibilityRole="button"
+          accessibilityLabel="Back to the national league table">
+          <Ionicons name="arrow-back" size={20} color={theme.text} />
+        </Pressable>
+        <Text style={[Typography.h1, { color: theme.text }]} numberOfLines={1}>
+          Divisions
+        </Text>
+      </View>
+
       {loading ? (
         <ActivityIndicator color={theme.primary} style={styles.loading} />
       ) : !overview ? (
         <View style={styles.emptyState}>
-          <Text style={[Typography.h1, { color: theme.text }]}>Divisions</Text>
           <Text style={[Typography.h2, { color: theme.text, textAlign: 'center' }]}>
             No season is open right now
           </Text>
@@ -126,7 +144,6 @@ export default function LeagueScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-          <Text style={[Typography.h1, { color: theme.text }]}>Divisions</Text>
           <Text style={[Typography.body, { color: theme.textSecondary }]}>
             Three divisions, seeded by personal best at the start of {overview.seasonName} and
             locked for its duration.
@@ -160,6 +177,26 @@ export default function LeagueScreen() {
 }
 
 const styles = StyleSheet.create({
+  /* Matches the content column's width and side padding so the arrow and the
+   * cards below it share a left edge. */
+  header: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.four,
+    paddingBottom: Spacing.two,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: Radii.circle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   loading: {
     flex: 1,
   },
@@ -175,6 +212,9 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     padding: Spacing.four,
+    // The title moved up into the header, so the old top padding would now
+    // read as a gap under it.
+    paddingTop: Spacing.two,
     paddingBottom: Spacing.four,
     gap: Spacing.three,
   },
