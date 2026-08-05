@@ -3,3 +3,8 @@ node_modules/
 # Per-machine Claude Code permissions — local by name, so it should not be
 # shared. It was tracked by mistake and showed as permanently modified.
 .claude/settings.local.json
+
+# Never commit credential files (docs/key.txt held the Supabase secret key)
+key.txt
+*.key
+docs/key.txt
