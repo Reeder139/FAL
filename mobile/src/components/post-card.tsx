@@ -1,3 +1,5 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -19,6 +21,7 @@ type PostCardProps = {
 
 export function PostCard({ item, viewerId, followingIds }: PostCardProps) {
   const theme = useTheme();
+  const router = useRouter();
   const openAngler = useOpenAngler();
   const [liked, setLiked] = useState(item.liked_by_viewer);
   const [likeCount, setLikeCount] = useState(item.like_count);
@@ -112,9 +115,17 @@ export function PostCard({ item, viewerId, followingIds }: PostCardProps) {
             <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>{likeCount}</Text>
           </Pressable>
 
-          <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>
-            {item.comment_count} {item.comment_count === 1 ? 'comment' : 'comments'}
-          </Text>
+          <Pressable
+            onPress={() => router.push({ pathname: '/comments', params: { postId: item.post_id } })}
+            hitSlop={Spacing.two}
+            accessibilityRole="button"
+            accessibilityLabel={`Comments on ${item.username}'s post`}
+            style={styles.commentButton}>
+            <Ionicons name="chatbubble-outline" size={16} color={theme.textSecondary} />
+            <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>
+              {item.comment_count} {item.comment_count === 1 ? 'comment' : 'comments'}
+            </Text>
+          </Pressable>
         </View>
       </View>
     </View>
@@ -175,6 +186,11 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
   },
   likeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  commentButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.one,
