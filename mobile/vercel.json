@@ -3,22 +3,49 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/league/:id", "destination": "/league/%5Bid%5D" },
-    { "source": "/profile/:id", "destination": "/profile/%5Bid%5D" },
-    { "source": "/(.*)", "destination": "/" }
+    {
+      "source": "/profile/support/:id",
+      "destination": "/profile/support/%5Bid%5D"
+    },
+    {
+      "source": "/league/:id",
+      "destination": "/league/%5Bid%5D"
+    },
+    {
+      "source": "/profile/:id",
+      "destination": "/profile/%5Bid%5D"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
   ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
       ]
     },
     {
       "source": "/manifest.webmanifest",
-      "headers": [{ "key": "Content-Type", "value": "application/manifest+json" }]
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json"
+        }
+      ]
     }
   ]
 }

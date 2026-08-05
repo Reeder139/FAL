@@ -51,6 +51,11 @@ export interface PreparedCatchPhoto {
   capturedInApp: boolean;
   width: number;
   height: number;
+  /** The untouched EXIF dict, stored alongside the three fields parsed out
+   * of it (post_media.exif_raw). Kept so a reviewer can see what was *not*
+   * parsed — GPS, orientation, lens, software tags — when a claim looks
+   * wrong, rather than that evidence being discarded at upload. */
+  exifRaw: Record<string, unknown> | null;
 }
 
 export interface UploadedCatchPhoto extends PreparedCatchPhoto {
@@ -165,6 +170,7 @@ export async function prepareCatchPhoto(photo: PickedCatchPhoto): Promise<Prepar
     capturedInApp: photo.capturedInApp,
     width: photo.width,
     height: photo.height,
+    exifRaw: photo.nativeExif,
   };
 }
 

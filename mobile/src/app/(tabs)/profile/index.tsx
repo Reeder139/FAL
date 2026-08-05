@@ -1,10 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { CatchGrid } from '@/components/catch-grid';
 import { ProfileHeader } from '@/components/profile-header';
 import { TabScreen } from '@/components/tab-screen';
+import { UnderReviewBanner } from '@/components/under-review-banner';
 import { BottomTabInset, MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { pickAndUploadAvatar } from '@/lib/avatarUpload';
@@ -15,6 +17,7 @@ import { useAuth } from '@/providers/auth-provider';
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const { profile, signOut, refreshProfile } = useAuth();
   const [changingAvatar, setChangingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
@@ -104,6 +107,25 @@ export default function ProfileScreen() {
                 {avatarError}
               </Text>
             )}
+
+            {/* Above the catch grid on purpose: a catch that stopped scoring
+              * is the most urgent thing on this screen, and it explains a
+              * total the angler may already be puzzled by. */}
+            <UnderReviewBanner />
+
+            <Pressable
+              onPress={() => router.push('/profile/support')}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.supportLink,
+                { borderColor: theme.border },
+                pressed && styles.pressed,
+              ]}>
+              <Ionicons name="chatbubble-ellipses-outline" size={16} color={theme.textSecondary} />
+              <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>
+                Support &amp; contact us
+              </Text>
+            </Pressable>
             <CatchGrid anglerId={profile.id} />
           </>
         )}
@@ -113,6 +135,17 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  supportLink: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    marginTop: Spacing.three,
+    paddingVertical: Spacing.three,
+    borderWidth: 1,
+    borderRadius: Radii.md,
+  },
   avatarError: {
     textAlign: 'center',
     marginBottom: Spacing.three,

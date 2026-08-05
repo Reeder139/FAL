@@ -204,6 +204,11 @@ create table post_media (
   -- client-side before compression (see mobile/src/lib/perceptualHash.ts).
   -- Used to reject exact-duplicate submissions — see section 13.
   perceptual_hash   text,
+  -- The untouched EXIF dict. The three parsed columns above are what queries
+  -- filter on; this is everything else — GPS, orientation, lens, software
+  -- tags — kept so a reviewer can see what we did not parse when a claim
+  -- looks wrong (see private.catch_review_detail).
+  exif_raw          jsonb,
   -- hero = the feed image (exactly one per catch), gallery = shown but not
   -- the hero, evidence = kept out of the feed entirely, visible only to the
   -- post author and admins (see the post_media select policy below).
@@ -1668,3 +1673,937 @@ comment on function public.search_anglers(text, integer) is
   'Fuzzy member search for the feed search dialog. Ranks by the greater of an exact/prefix/substring ladder and trigram similarity, so partial names and typos both resolve to the intended angler. Excludes the caller. SECURITY INVOKER — profiles RLS still applies.';
 
 grant execute on function public.search_anglers(text, integer) to authenticated;
+
+
+-- ===========================================================================
+-- SECTION 14 — ADMIN LAYER
+--
+-- Applied by:
+--   20260805000000_admin_audit_and_support.sql
+--   20260805010000_admin_functions.sql
+--   20260805020000_catch_review_detail.sql
+--
+-- The console is Retool over the Data API, so every admin capability is
+-- schema and functions rather than application code. There is one
+-- implementation of "verify a catch" regardless of who calls it.
+-- ===========================================================================
+
+-- ===========================================================================
+-- Admin layer, part 1 of 3: the tables the console writes to.
+--
+-- The console itself is Retool over the Data API, so everything it can do
+-- has to exist here as schema and functions rather than as application code.
+-- That is the point: business logic lives in Postgres, and there is exactly
+-- one implementation of "verify a catch" no matter who calls it.
+-- ===========================================================================
+
+-- ---------------------------------------------------------------------------
+-- ADMIN ACTIONS — the audit trail
+--
+-- Every admin function writes one row here before it returns. Not a
+-- convention that can be forgotten: the helper that writes it is the same
+-- helper that checks the caller is an admin, so an action that skipped the
+-- audit would also have skipped its own authorisation.
+--
+-- Append-only, enforced twice over. RLS grants no update or delete to
+-- anyone, and the trigger below refuses them outright — because the console
+-- runs on service_role, which bypasses RLS entirely. Policy alone would
+-- protect this table from every caller except the one that actually uses it.
+-- ---------------------------------------------------------------------------
+create table admin_actions (
+  id           uuid primary key default gen_random_uuid(),
+  -- Nullable because a system action (a scheduled close, say) has no human
+  -- actor. Never nullable *because we did not bother* to record one.
+  actor_id     uuid references profiles(id),
+  action       text not null,
+  target_table text not null,
+  target_id    uuid,
+  -- Whatever the action needs to be reconstructed later: the reason given,
+  -- the before and after values, the arguments it was called with.
+  detail       jsonb not null default '{}'::jsonb,
+  created_at   timestamptz not null default now()
+);
+
+create index on admin_actions (created_at desc);
+create index on admin_actions (target_table, target_id);
+create index on admin_actions (actor_id, created_at desc);
+
+create or replace function private.admin_actions_are_append_only()
+returns trigger
+language plpgsql as $$
+begin
+  raise exception 'admin_actions is append-only; % is not permitted', tg_op;
+end; $$;
+
+create trigger admin_actions_no_update
+  before update or delete on admin_actions
+  for each row execute function private.admin_actions_are_append_only();
+
+-- ---------------------------------------------------------------------------
+-- SUPPORT
+--
+-- Threads belong to a member and are worked by staff. Messages carry an
+-- internal_note flag so staff can talk to each other in the same thread the
+-- member is reading — which is the only reason the flag exists, and the
+-- reason the member-facing select policy has to filter on it rather than
+-- the app remembering to.
+-- ---------------------------------------------------------------------------
+create table support_threads (
+  id           uuid primary key default gen_random_uuid(),
+  member_id    uuid not null references profiles(id) on delete cascade,
+  subject      text not null,
+  status       text not null default 'open'
+                 check (status in ('open','waiting','resolved')),
+  -- Which admin owns it. Null = unassigned queue.
+  assigned_to  uuid references profiles(id),
+  -- Set when a thread was opened by the system on the member's behalf, e.g.
+  -- request_evidence(). Lets the console separate "member asked us something"
+  -- from "we asked the member something".
+  opened_by_staff boolean not null default false,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+
+create index on support_threads (member_id, created_at desc);
+create index on support_threads (status, updated_at desc);
+create index on support_threads (assigned_to, status);
+
+create table support_messages (
+  id            uuid primary key default gen_random_uuid(),
+  thread_id     uuid not null references support_threads(id) on delete cascade,
+  author_id     uuid references profiles(id),
+  body          text not null,
+  -- Staff-only. Never returned to the member — see the select policy.
+  internal_note boolean not null default false,
+  created_at    timestamptz not null default now()
+);
+
+create index on support_messages (thread_id, created_at);
+
+-- Keeps the thread list sortable by real activity rather than by when the
+-- thread happened to be opened.
+create or replace function private.touch_support_thread()
+returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  update support_threads set updated_at = now() where id = new.thread_id;
+  return null;
+end; $$;
+
+create trigger support_messages_touch_thread
+  after insert on support_messages
+  for each row execute function private.touch_support_thread();
+
+-- ---------------------------------------------------------------------------
+-- POST MEDIA — full EXIF
+--
+-- The parsed columns (exif_taken_at, camera make/model) stay: they are what
+-- queries filter on. This is the rest of it, kept verbatim so a reviewer can
+-- see what we did *not* parse — GPS, orientation, software tags, lens — when
+-- a claim looks wrong. Parsing more fields later is then a question about
+-- data we already hold rather than data we threw away.
+-- ---------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------
+-- RLS
+-- ---------------------------------------------------------------------------
+alter table admin_actions    enable row level security;
+alter table support_threads  enable row level security;
+alter table support_messages enable row level security;
+
+-- admin_actions: readable by admins, written only by the security-definer
+-- helper. No insert policy for anyone else, and deliberately no update or
+-- delete policy at all.
+create policy "admin actions readable by admins"
+  on admin_actions for select using (public.is_admin());
+
+-- support_threads: your own, or anything if you are staff.
+create policy "members read their own threads"
+  on support_threads for select
+  using (member_id = auth.uid() or public.is_admin());
+
+create policy "members open their own threads"
+  on support_threads for insert
+  with check (member_id = auth.uid() and not opened_by_staff);
+
+create policy "admins update threads"
+  on support_threads for update using (public.is_admin());
+
+-- support_messages: messages on your own threads, minus the internal notes.
+create policy "members read replies on their own threads"
+  on support_messages for select
+  using (
+    public.is_admin()
+    or (
+      not internal_note
+      and exists (
+        select 1 from support_threads t
+        where t.id = support_messages.thread_id and t.member_id = auth.uid()
+      )
+    )
+  );
+
+create policy "members reply on their own threads"
+  on support_messages for insert
+  with check (
+    author_id = auth.uid()
+    and not internal_note
+    and exists (
+      select 1 from support_threads t
+      where t.id = support_messages.thread_id and t.member_id = auth.uid()
+    )
+  );
+
+create policy "admins write messages"
+  on support_messages for insert with check (public.is_admin());
+
+-- ===========================================================================
+-- Admin layer, part 2 of 3: the functions the console calls.
+--
+-- All security definer, all admin-gated, all audited. The gate and the audit
+-- are the same call — private.admin_audit() — so there is no path that
+-- performs an action without recording it, and none that records without
+-- having checked.
+--
+-- Every one of these takes a reason. Standings and money are downstream of
+-- most of them, and "who changed this and why" needs to survive the person
+-- who did it leaving.
+-- ===========================================================================
+
+-- pg_net is what lets trigger_password_reset() reach GoTrue. Postgres cannot
+-- mint a recovery link itself — that is an auth-server concern — so the
+-- function has to make an HTTP call like any other client would.
+create extension if not exists pg_net with schema extensions;
+
+-- ---------------------------------------------------------------------------
+-- GATE + AUDIT
+-- ---------------------------------------------------------------------------
+
+/**
+ * Authorise the caller and record what they did, in one call.
+ *
+ * Accepts two kinds of caller: a signed-in admin (a human in the console
+ * with their own account), and service_role (Retool's server-side key).
+ * service_role has to be allowed explicitly — it bypasses RLS, but
+ * is_admin() reads auth.uid(), which is null for it, so a check on
+ * is_admin() alone would lock the console out of its own admin functions.
+ *
+ * actor_id is therefore null for service_role calls and set for human ones.
+ * That distinction is worth keeping: it is the difference between "an admin
+ * did this" and "something automated did this".
+ */
+create or replace function private.admin_audit(
+  p_action       text,
+  p_target_table text,
+  p_target_id    uuid,
+  p_detail       jsonb default '{}'::jsonb
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_role text := coalesce(auth.role(), '');
+begin
+  if v_role <> 'service_role' and not public.is_admin() then
+    raise exception 'admin privileges required' using errcode = '42501';
+  end if;
+
+  insert into admin_actions (actor_id, action, target_table, target_id, detail)
+  values (auth.uid(), p_action, p_target_table, p_target_id, coalesce(p_detail, '{}'::jsonb));
+end; $$;
+
+-- ---------------------------------------------------------------------------
+-- CATCH MODERATION
+--
+-- catches.status is never written by these functions. They insert into
+-- catch_reviews and the trigger below propagates it, which makes the review
+-- log the cause of a status rather than a note written alongside it. A catch
+-- cannot end up verified with no record of who verified it, because the
+-- record is the mechanism.
+-- ---------------------------------------------------------------------------
+
+create or replace function private.capture_review_from_status()
+returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  -- Filled here rather than by callers so it cannot disagree with reality.
+  if new.from_status is null then
+    select c.status into new.from_status from catches c where c.id = new.catch_id;
+  end if;
+  return new;
+end; $$;
+
+create trigger catch_reviews_capture_from_status
+  before insert on catch_reviews
+  for each row execute function private.capture_review_from_status();
+
+create or replace function private.apply_catch_review()
+returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  update catches set status = new.to_status where id = new.catch_id;
+  return null;
+end; $$;
+
+create trigger catch_reviews_apply_status
+  after insert on catch_reviews
+  for each row execute function private.apply_catch_review();
+
+create or replace function public.verify_catch(p_catch_id uuid, p_reason text)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  perform private.admin_audit('verify_catch', 'catches', p_catch_id,
+    jsonb_build_object('reason', p_reason));
+
+  insert into catch_reviews (catch_id, reviewer_id, to_status, reason)
+  values (p_catch_id, auth.uid(), 'verified', p_reason);
+end; $$;
+
+create or replace function public.reject_catch(p_catch_id uuid, p_reason text)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  perform private.admin_audit('reject_catch', 'catches', p_catch_id,
+    jsonb_build_object('reason', p_reason));
+
+  insert into catch_reviews (catch_id, reviewer_id, to_status, reason)
+  values (p_catch_id, auth.uid(), 'rejected', p_reason);
+end; $$;
+
+/**
+ * Ask the angler for more evidence.
+ *
+ * Three things happen together and must not come apart: the catch stops
+ * counting, the angler is told, and there is somewhere for them to reply.
+ * The support thread is the notification — there is no separate
+ * notifications table, and adding one to say a single thing that already has
+ * a home would be worse. The app surfaces the open thread as a banner on the
+ * catch (see the under-review banner in the feed and profile).
+ */
+create or replace function public.request_evidence(p_catch_id uuid, p_message text)
+returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_angler_id uuid;
+  v_weight_oz integer;
+  v_thread_id uuid;
+begin
+  select c.angler_id, c.weight_oz into v_angler_id, v_weight_oz
+  from catches c where c.id = p_catch_id;
+  if v_angler_id is null then
+    raise exception 'catch % not found', p_catch_id using errcode = 'P0002';
+  end if;
+
+  perform private.admin_audit('request_evidence', 'catches', p_catch_id,
+    jsonb_build_object('message', p_message, 'angler_id', v_angler_id));
+
+  insert into catch_reviews (catch_id, reviewer_id, to_status, reason)
+  values (p_catch_id, auth.uid(), 'under_review', p_message);
+
+  insert into support_threads (member_id, subject, status, opened_by_staff)
+  values (
+    v_angler_id,
+    'Evidence needed for your ' || (v_weight_oz / 16) || 'lb ' || (v_weight_oz % 16) || 'oz catch',
+    'waiting',
+    true
+  )
+  returning id into v_thread_id;
+
+  insert into support_messages (thread_id, author_id, body)
+  values (v_thread_id, auth.uid(), p_message);
+
+  return v_thread_id;
+end; $$;
+
+-- ---------------------------------------------------------------------------
+-- MEMBERS
+-- ---------------------------------------------------------------------------
+
+create or replace function public.suspend_member(p_user_id uuid, p_reason text)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  perform private.admin_audit('suspend_member', 'profiles', p_user_id,
+    jsonb_build_object('reason', p_reason));
+
+  update profiles set suspended_at = now() where id = p_user_id;
+end; $$;
+
+create or replace function public.unsuspend_member(p_user_id uuid, p_reason text)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  perform private.admin_audit('unsuspend_member', 'profiles', p_user_id,
+    jsonb_build_object('reason', p_reason));
+
+  update profiles set suspended_at = null where id = p_user_id;
+end; $$;
+
+/**
+ * Confirm a declared PB against evidence.
+ *
+ * Writes the weight as well as the flag, because verification usually
+ * settles what the number actually is. The previous value goes in the audit
+ * detail — this is the one member field that decides division placement, so
+ * "it used to say something else" needs to be answerable.
+ */
+create or replace function public.verify_pb(p_user_id uuid, p_weight_oz integer)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_before integer;
+begin
+  select declared_pb_oz into v_before from profiles where id = p_user_id;
+
+  perform private.admin_audit('verify_pb', 'profiles', p_user_id,
+    jsonb_build_object('declared_pb_oz_before', v_before, 'declared_pb_oz_after', p_weight_oz));
+
+  update profiles
+     set declared_pb_oz = p_weight_oz,
+         pb_verified    = true
+   where id = p_user_id;
+end; $$;
+
+/** Move an angler between divisions mid-season. Records where they came
+ * from, since this directly changes who they are competing against for a
+ * cash prize. */
+create or replace function public.set_division(
+  p_user_id     uuid,
+  p_season_id   uuid,
+  p_division_id uuid,
+  p_reason      text
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_before uuid;
+begin
+  select division_id into v_before
+    from season_entries
+   where angler_id = p_user_id and season_id = p_season_id;
+
+  perform private.admin_audit('set_division', 'season_entries', p_user_id,
+    jsonb_build_object(
+      'season_id', p_season_id,
+      'division_before', v_before,
+      'division_after', p_division_id,
+      'reason', p_reason
+    ));
+
+  update season_entries
+     set division_id = p_division_id
+   where angler_id = p_user_id and season_id = p_season_id;
+
+  if not found then
+    raise exception 'no season entry for angler % in season %', p_user_id, p_season_id
+      using errcode = 'P0002';
+  end if;
+end; $$;
+
+/**
+ * Send the member a password reset.
+ *
+ * Postgres cannot mint a recovery link — GoTrue owns that — so this calls
+ * the auth admin API over pg_net. The service key comes from Vault rather
+ * than being written into the function body, because a function definition
+ * is readable by anyone who can read the catalogue.
+ *
+ * Setup, once, before this works:
+ *   select vault.create_secret('<service_role_key>', 'service_role_key');
+ *   select vault.create_secret('https://<ref>.supabase.co', 'project_url');
+ *
+ * Fire-and-forget by design: pg_net queues the request and returns an id.
+ * The audit row is the record that we asked, not proof the email arrived.
+ */
+create or replace function public.trigger_password_reset(p_user_id uuid)
+returns bigint
+language plpgsql security definer set search_path = public as $$
+declare
+  v_email       text;
+  v_service_key text;
+  v_project_url text;
+  v_request_id  bigint;
+begin
+  select u.email into v_email from auth.users u where u.id = p_user_id;
+  if v_email is null then
+    raise exception 'user % not found', p_user_id using errcode = 'P0002';
+  end if;
+
+  perform private.admin_audit('trigger_password_reset', 'profiles', p_user_id, '{}'::jsonb);
+
+  select decrypted_secret into v_service_key
+    from vault.decrypted_secrets where name = 'service_role_key';
+  select decrypted_secret into v_project_url
+    from vault.decrypted_secrets where name = 'project_url';
+
+  if v_service_key is null or v_project_url is null then
+    raise exception
+      'vault secrets service_role_key and project_url must be set before password resets can be sent'
+      using errcode = '55000';
+  end if;
+
+  select net.http_post(
+    url     := v_project_url || '/auth/v1/recover',
+    headers := jsonb_build_object(
+                 'Content-Type', 'application/json',
+                 'apikey', v_service_key,
+                 'Authorization', 'Bearer ' || v_service_key
+               ),
+    body    := jsonb_build_object('email', v_email)
+  ) into v_request_id;
+
+  return v_request_id;
+end; $$;
+
+/**
+ * Change a member's sign-in email.
+ *
+ * Writes auth.users directly, which skips the confirm-both-addresses dance
+ * GoTrue normally runs. That is the point — this exists for the case where
+ * the member has lost the old address and cannot confirm anything — but it
+ * means the new address is trusted on an admin's say-so, so the old one is
+ * kept in the audit detail.
+ */
+create or replace function public.update_member_email(p_user_id uuid, p_new_email text)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_before text;
+begin
+  select email into v_before from auth.users where id = p_user_id;
+  if v_before is null then
+    raise exception 'user % not found', p_user_id using errcode = 'P0002';
+  end if;
+
+  perform private.admin_audit('update_member_email', 'profiles', p_user_id,
+    jsonb_build_object('email_before', v_before, 'email_after', p_new_email));
+
+  update auth.users
+     set email              = p_new_email,
+         email_confirmed_at = coalesce(email_confirmed_at, now()),
+         updated_at         = now()
+   where id = p_user_id;
+end; $$;
+
+-- ---------------------------------------------------------------------------
+-- VENUES
+-- ---------------------------------------------------------------------------
+
+/**
+ * Fold a duplicate venue into the one that survives.
+ *
+ * Never deletes. The loser keeps its row with merged_into set, so a catch
+ * logged against it still resolves and an old link still works — and so the
+ * merge can be reasoned about afterwards, which a delete makes impossible.
+ * Catches are repointed because the venue's weight distribution is a fraud
+ * signal (see private.venue_distributions), and a distribution split across
+ * two spellings of the same lake is worth less than one.
+ */
+create or replace function public.merge_venues(p_loser_id uuid, p_survivor_id uuid)
+returns integer
+language plpgsql security definer set search_path = public as $$
+declare
+  v_moved integer;
+begin
+  if p_loser_id = p_survivor_id then
+    raise exception 'cannot merge a venue into itself' using errcode = '22023';
+  end if;
+
+  perform private.admin_audit('merge_venues', 'venues', p_loser_id,
+    jsonb_build_object('survivor_id', p_survivor_id));
+
+  update catches set venue_id = p_survivor_id where venue_id = p_loser_id;
+  get diagnostics v_moved = row_count;
+
+  update venues set merged_into = p_survivor_id where id = p_loser_id;
+
+  -- Recorded a second time now the count is known, so the audit says how
+  -- much moved rather than only that a merge was attempted.
+  perform private.admin_audit('merge_venues_complete', 'venues', p_loser_id,
+    jsonb_build_object('survivor_id', p_survivor_id, 'catches_moved', v_moved));
+
+  return v_moved;
+end; $$;
+
+create or replace function public.approve_venue(p_venue_id uuid)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  perform private.admin_audit('approve_venue', 'venues', p_venue_id, '{}'::jsonb);
+  update venues set approved = true where id = p_venue_id;
+end; $$;
+
+-- ---------------------------------------------------------------------------
+-- SEASONS
+--
+-- Only one season may be `running` at a time. The app resolves the current
+-- season with a single-row lookup on that status — league tables, the PB
+-- calculation, the divisions page — so a second running season would not
+-- produce a merged league, it would produce whichever row came back first.
+-- Enforced as an index rather than as a rule inside open_season(), so it
+-- also holds against a hand-written update in the console.
+-- ---------------------------------------------------------------------------
+create unique index if not exists seasons_one_running
+  on seasons ((status)) where status = 'running';
+
+create or replace function public.create_season(
+  p_name          text,
+  p_starts_on     date,
+  p_ends_on       date,
+  p_counting_fish smallint
+)
+returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_id uuid;
+begin
+  if p_ends_on <= p_starts_on then
+    raise exception 'season must end after it starts' using errcode = '22023';
+  end if;
+
+  insert into seasons (name, starts_on, ends_on, counting_fish)
+  values (p_name, p_starts_on, p_ends_on, p_counting_fish)
+  returning id into v_id;
+
+  perform private.admin_audit('create_season', 'seasons', v_id,
+    jsonb_build_object('name', p_name, 'starts_on', p_starts_on,
+                       'ends_on', p_ends_on, 'counting_fish', p_counting_fish));
+
+  return v_id;
+end; $$;
+
+/**
+ * Retune a season's scoring.
+ *
+ * The whole point of scoring being computed rather than stored: this
+ * re-scores every leaderboard the moment it commits, with no backfill. The
+ * before values are audited because that also means there is no other record
+ * of what the table looked like an hour ago.
+ */
+create or replace function public.set_scoring(
+  p_season_id        uuid,
+  p_multiplier       numeric,
+  p_offset_oz        integer,
+  p_exponent         numeric,
+  p_min_qualifying   integer
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_before jsonb;
+begin
+  select to_jsonb(s) - 'id' - 'name' - 'created_at' into v_before
+    from seasons s where s.id = p_season_id;
+  if v_before is null then
+    raise exception 'season % not found', p_season_id using errcode = 'P0002';
+  end if;
+
+  perform private.admin_audit('set_scoring', 'seasons', p_season_id,
+    jsonb_build_object(
+      'before', v_before,
+      'after', jsonb_build_object(
+        'scoring_multiplier', p_multiplier,
+        'scoring_offset_oz', p_offset_oz,
+        'scoring_exponent', p_exponent,
+        'min_qualifying_oz', p_min_qualifying
+      )
+    ));
+
+  update seasons
+     set scoring_multiplier = p_multiplier,
+         scoring_offset_oz  = p_offset_oz,
+         scoring_exponent   = p_exponent,
+         min_qualifying_oz  = p_min_qualifying
+   where id = p_season_id;
+end; $$;
+
+/** Resize a division's PB band. Audited with the old bounds because this
+ * decides who is seeded where next season. */
+create or replace function public.set_division_boundaries(
+  p_division_id uuid,
+  p_min_pb_oz   integer,
+  p_max_pb_oz   integer
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_before jsonb;
+begin
+  select jsonb_build_object('min_pb_oz', d.min_pb_oz, 'max_pb_oz', d.max_pb_oz)
+    into v_before from divisions d where d.id = p_division_id;
+  if v_before is null then
+    raise exception 'division % not found', p_division_id using errcode = 'P0002';
+  end if;
+
+  if p_min_pb_oz is not null and p_max_pb_oz is not null and p_max_pb_oz < p_min_pb_oz then
+    raise exception 'max_pb_oz must not be below min_pb_oz' using errcode = '22023';
+  end if;
+
+  perform private.admin_audit('set_division_boundaries', 'divisions', p_division_id,
+    jsonb_build_object('before', v_before,
+                       'after', jsonb_build_object('min_pb_oz', p_min_pb_oz, 'max_pb_oz', p_max_pb_oz)));
+
+  update divisions
+     set min_pb_oz = p_min_pb_oz,
+         max_pb_oz = p_max_pb_oz
+   where id = p_division_id;
+end; $$;
+
+/** Make a season live. `running` is the status the app treats as current —
+ * see the single-running index above. */
+create or replace function public.open_season(p_season_id uuid)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_before text;
+begin
+  select status into v_before from seasons where id = p_season_id;
+  if v_before is null then
+    raise exception 'season % not found', p_season_id using errcode = 'P0002';
+  end if;
+  if v_before = 'closed' then
+    raise exception 'season % is closed and cannot be reopened', p_season_id using errcode = '22023';
+  end if;
+
+  perform private.admin_audit('open_season', 'seasons', p_season_id,
+    jsonb_build_object('status_before', v_before, 'status_after', 'running'));
+
+  update seasons set status = 'running' where id = p_season_id;
+end; $$;
+
+/** Close a season. Final standings are still computed from the same views —
+ * closing stops new catches counting, it does not freeze a table anywhere,
+ * because nothing is stored to freeze. */
+create or replace function public.close_season(p_season_id uuid)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_before text;
+begin
+  select status into v_before from seasons where id = p_season_id;
+  if v_before is null then
+    raise exception 'season % not found', p_season_id using errcode = 'P0002';
+  end if;
+
+  perform private.admin_audit('close_season', 'seasons', p_season_id,
+    jsonb_build_object('status_before', v_before));
+
+  update seasons set status = 'closed' where id = p_season_id;
+end; $$;
+
+-- ---------------------------------------------------------------------------
+-- GRANTS
+--
+-- anon loses execute outright — nothing here should be reachable without a
+-- session. `authenticated` keeps it, because these are gated in the body and
+-- a signed-in admin working in the console under their own account is a
+-- supported caller; revoking it would leave the is_admin() branch of
+-- admin_audit() as dead code and service_role as the only way in, which
+-- costs the audit trail its actor_id.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  fn text;
+begin
+  foreach fn in array array[
+    'public.verify_catch(uuid,text)',
+    'public.reject_catch(uuid,text)',
+    'public.request_evidence(uuid,text)',
+    'public.suspend_member(uuid,text)',
+    'public.unsuspend_member(uuid,text)',
+    'public.verify_pb(uuid,integer)',
+    'public.set_division(uuid,uuid,uuid,text)',
+    'public.trigger_password_reset(uuid)',
+    'public.update_member_email(uuid,text)',
+    'public.merge_venues(uuid,uuid)',
+    'public.approve_venue(uuid)',
+    'public.create_season(text,date,date,smallint)',
+    'public.set_scoring(uuid,numeric,integer,numeric,integer)',
+    'public.set_division_boundaries(uuid,integer,integer)',
+    'public.open_season(uuid)',
+    'public.close_season(uuid)'
+  ]
+  loop
+    execute format('revoke all on function %s from public, anon', fn);
+    execute format('grant execute on function %s to service_role, authenticated', fn);
+  end loop;
+end $$;
+
+-- ===========================================================================
+-- Admin layer, part 3 of 3: the review view.
+--
+-- One row per catch carrying everything needed to judge it, so a reviewer
+-- makes a decision from a single query instead of assembling it from eight.
+-- That matters beyond convenience: a reviewer who has to go and look up the
+-- angler's digit profile separately usually will not, and the signal only
+-- works if it is in front of them.
+--
+-- Lives in `private`, which is not exposed through the Data API. Anglers
+-- must never be able to see what trips these checks — a percentile, a hash
+-- collision, a rounding tell — because anything visible gets optimised
+-- around. Retool reaches it on service_role.
+-- ===========================================================================
+
+create or replace view private.catch_review_detail
+with (security_invoker = on) as
+select
+  c.id                as catch_id,
+  c.status,
+  c.evidence_tier,
+  c.weight_oz,
+  c.species,
+  c.fish_name,
+  c.caught_at,
+  c.is_pb,
+  c.created_at        as submitted_at,
+  p.id                as post_id,
+  p.caption,
+
+  -- ---- the angler -------------------------------------------------------
+  pr.id               as angler_id,
+  pr.username,
+  pr.display_name,
+  pr.declared_pb_oz,
+  pr.pb_verified,
+  pr.identity_verified,
+  pr.suspended_at,
+  pr.created_at       as angler_joined_at,
+
+  -- This claim against what the angler says their best ever is. A first
+  -- fish that beats a declared PB by a wide margin is the ordinary shape of
+  -- both a genuine career-best and an invented weight, which is exactly why
+  -- it belongs next to everything else rather than on its own.
+  c.weight_oz - coalesce(pr.declared_pb_oz, 0) as oz_over_declared_pb,
+
+  -- ---- the venue --------------------------------------------------------
+  v.id                as venue_id,
+  v.name              as venue_name,
+  v.approved          as venue_approved,
+  vd.n                as venue_verified_catches,
+  vd.p50_oz           as venue_p50_oz,
+  vd.p95_oz           as venue_p95_oz,
+  vd.max_oz           as venue_max_oz,
+  -- Where this claim sits in the venue's own history. Percentile rather
+  -- than a flat threshold because a 40lb fish means something different on
+  -- each water, and the venue is the only thing that knows which.
+  case
+    when vd.n is null or vd.n = 0 then null
+    else round(100.0 * (
+      select count(*) from public.catches oc
+       where oc.venue_id = c.venue_id
+         and oc.status = 'verified'
+         and oc.id <> c.id
+         and oc.weight_oz <= c.weight_oz
+    ) / vd.n, 1)
+  end                 as venue_percentile,
+
+  -- ---- terminal-digit profile ------------------------------------------
+  -- Honest weights spread 0-15 across weight_oz % 16. Invented ones cluster
+  -- on 0 and 8, because people making numbers up round to the pound or the
+  -- half. Meaningless on a handful of fish, which is why n travels with it.
+  odp.n                 as angler_catch_count,
+  odp.ends_zero,
+  odp.ends_eight,
+  odp.pct_round_numbers,
+  c.weight_oz % 16      as this_catch_ounce_digit,
+
+  -- ---- media, including evidence-only ----------------------------------
+  -- The whole set, not the feed subset: evidence photos are the ones taken
+  -- for exactly this purpose and are invisible everywhere else.
+  (
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'id', m.id,
+             'storage_path', m.storage_path,
+             'media_kind', m.media_kind,
+             'media_role', m.media_role,
+             'captured_in_app', m.captured_in_app,
+             'exif_taken_at', m.exif_taken_at,
+             'exif_camera_make', m.exif_camera_make,
+             'exif_camera_model', m.exif_camera_model,
+             'exif_raw', m.exif_raw,
+             'perceptual_hash', m.perceptual_hash,
+             'width', m.width,
+             'height', m.height
+           ) order by m.media_role, m.sort_order), '[]'::jsonb)
+      from public.post_media m where m.post_id = c.post_id
+  ) as media,
+
+  -- The single most important field in the whole view: tier 2+ evidence
+  -- requires photos taken in-app, and this is whether any actually were.
+  (
+    select count(*) from public.post_media m
+     where m.post_id = c.post_id and m.captured_in_app
+  ) as in_app_photo_count,
+
+  -- ---- perceptual hash matches -----------------------------------------
+  -- The same photo submitted twice, by the same angler or a different one.
+  -- Exact hash equality only — near-duplicate scoring is a separate job and
+  -- a loose match here would cost a reviewer more time than it saved.
+  (
+    select coalesce(jsonb_agg(distinct jsonb_build_object(
+             'catch_id', oc.id,
+             'angler_id', oc.angler_id,
+             'username', opr.username,
+             'weight_oz', oc.weight_oz,
+             'caught_at', oc.caught_at,
+             'status', oc.status,
+             'perceptual_hash', om.perceptual_hash
+           )), '[]'::jsonb)
+      from public.post_media om
+      join public.post_media mine
+        on mine.post_id = c.post_id
+       and mine.perceptual_hash is not null
+       and om.perceptual_hash = mine.perceptual_hash
+      join public.posts op   on op.id = om.post_id
+      join public.catches oc on oc.post_id = op.id and oc.id <> c.id
+      join public.profiles opr on opr.id = oc.angler_id
+  ) as hash_matches,
+
+  -- ---- the angler's history --------------------------------------------
+  (
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'catch_id', hc.id,
+             'weight_oz', hc.weight_oz,
+             'caught_at', hc.caught_at,
+             'status', hc.status,
+             'evidence_tier', hc.evidence_tier,
+             'venue_id', hc.venue_id
+           ) order by hc.caught_at desc), '[]'::jsonb)
+      from public.catches hc where hc.angler_id = c.angler_id
+  ) as angler_history,
+
+  -- ---- review trail and flags ------------------------------------------
+  (
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'from_status', r.from_status,
+             'to_status', r.to_status,
+             'reason', r.reason,
+             'reviewer_id', r.reviewer_id,
+             'is_system', r.is_system,
+             'created_at', r.created_at
+           ) order by r.created_at), '[]'::jsonb)
+      from public.catch_reviews r where r.catch_id = c.id
+  ) as review_history,
+
+  (
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'flag_id', f.id,
+             'reporter_id', f.reporter_id,
+             'reason', f.reason,
+             'resolved_at', f.resolved_at,
+             'created_at', f.created_at
+           ) order by f.created_at desc), '[]'::jsonb)
+      from public.flags f where f.catch_id = c.id
+  ) as flags,
+
+  (
+    select count(*) from public.flags f
+     where f.catch_id = c.id and f.resolved_at is null
+  ) as open_flag_count
+
+from public.catches c
+join public.posts p       on p.id = c.post_id
+join public.profiles pr   on pr.id = c.angler_id
+left join public.venues v on v.id = c.venue_id
+left join private.venue_distributions vd on vd.venue_id = c.venue_id
+left join private.ounce_digit_profile odp on odp.angler_id = c.angler_id;
