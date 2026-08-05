@@ -309,6 +309,50 @@ update support_threads
 
 ---
 
+## Posts
+
+```ts
+// delete_post — soft delete. The row and its media stay, because a catch
+// photo is evidence and a later dispute is settled with it.
+//
+// If the post carries a catch, this also rejects the catch through
+// catch_reviews, so it drops out of scored_catches. Setting deleted_at alone
+// would hide the post and leave the points on the board — scored_catches
+// never joins posts.
+//
+// Anglers can delete their own non-catch posts themselves. They cannot
+// delete a catch post; that is this function's job.
+export default async function ({ params, user }) {
+  const { postId, reason } = params
+  if (!reason?.trim()) throw new Error('A reason is required.')
+
+  await carpLeaguesAdmin.query(
+    `with actor as (select set_config('app.admin_actor', $1, true))
+     select public.delete_post($2::uuid, $3::text) from actor`,
+    [user.email, postId, reason.trim()]
+  )
+  return { success: true }
+}
+```
+
+```sql
+-- Deleted posts (they stay in the table; nothing is destroyed)
+select p.id, p.kind, p.caption, p.deleted_at, pr.username,
+       c.id as catch_id, c.weight_oz, c.status as catch_status
+from posts p
+join profiles pr on pr.id = p.author_id
+left join catches c on c.post_id = p.id
+where p.deleted_at is not null
+order by p.deleted_at desc;
+```
+
+There is deliberately no `restore_post`. Undeleting would have to decide what
+to do about the catch it rejected on the way down, and "put the points back"
+is a standings change that should be an explicit `verify_catch` with its own
+reason, not a side effect of undoing something.
+
+---
+
 ## Read queries
 
 ```sql

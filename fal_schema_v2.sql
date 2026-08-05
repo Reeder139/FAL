@@ -757,7 +757,18 @@ create policy "posts readable by visibility"
 create policy "authors write own posts"
   on posts for insert with check (auth.uid() = author_id);
 create policy "authors edit own posts"
-  on posts for update using (auth.uid() = author_id);
+  on posts for update using (auth.uid() = author_id)
+  with check (
+    auth.uid() = author_id
+    and (
+      -- Captions and visibility stay editable. Self-deleting a post that
+      -- carries a catch does not: scored_catches never joins posts, so a
+      -- deleted catch post keeps scoring, and an angler could take the
+      -- photograph out of public view while keeping the points.
+      deleted_at is null
+      or not exists (select 1 from catches c where c.post_id = posts.id)
+    )
+  );
 
 -- --- post_media -------------------------------------------------------------
 -- Evidence-role media (e.g. a scales close-up the angler doesn't want in
@@ -2736,3 +2747,50 @@ begin
   insert into admin_actions (actor_id, action, target_table, target_id, detail)
   values (auth.uid(), p_action, p_target_table, p_target_id, v_detail);
 end; $$;
+
+-- --- deleting a post -------------------------------------------------------
+create or replace function public.delete_post(p_post_id uuid, p_reason text)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_author_id  uuid;
+  v_kind       text;
+  v_deleted_at timestamptz;
+  v_catch_id   uuid;
+  v_status     text;
+begin
+  select p.author_id, p.kind, p.deleted_at
+    into v_author_id, v_kind, v_deleted_at
+    from posts p where p.id = p_post_id;
+  if v_author_id is null then
+    raise exception 'post % not found', p_post_id using errcode = 'P0002';
+  end if;
+  if v_deleted_at is not null then
+    raise exception 'post % is already deleted', p_post_id using errcode = '22023';
+  end if;
+
+  select c.id, c.status into v_catch_id, v_status
+    from catches c where c.post_id = p_post_id;
+
+  perform private.admin_audit('delete_post', 'posts', p_post_id,
+    jsonb_build_object(
+      'reason', p_reason,
+      'author_id', v_author_id,
+      'kind', v_kind,
+      'catch_id', v_catch_id,
+      'catch_status_before', v_status
+    ));
+
+  update posts set deleted_at = now() where id = p_post_id;
+
+  -- Only when it still counts. Re-rejecting an already-rejected catch would
+  -- add a review saying nothing happened.
+  if v_catch_id is not null and v_status <> 'rejected' then
+    insert into catch_reviews (catch_id, reviewer_id, to_status, reason)
+    values (v_catch_id, auth.uid(), 'rejected',
+            coalesce(nullif(trim(p_reason), ''), 'Post deleted'));
+  end if;
+end; $$;
+
+revoke all on function public.delete_post(uuid, text) from public, anon;
+grant execute on function public.delete_post(uuid, text) to service_role, authenticated;
