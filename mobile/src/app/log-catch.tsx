@@ -19,7 +19,7 @@ import { FormField } from '@/components/form-field';
 import { PhotoRoleStrip, type PhotoStripItem } from '@/components/photo-role-strip';
 import { VenuePicker, type VenueSelection } from '@/components/venue-picker';
 import { VisibilityPicker } from '@/components/visibility-picker';
-import { MaxContentWidth, Spacing, Typography } from '@/constants/theme';
+import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   MAX_CATCH_PHOTOS,
@@ -31,7 +31,7 @@ import {
   type PreparedCatchPhoto,
 } from '@/lib/catchPhoto';
 import { fetchCatchResult, type CatchResultData } from '@/lib/catchResult';
-import { computePoints, fetchSeasonForDate, type SeasonScoring } from '@/lib/scoring';
+import { computePoints, fetchSeasonForDate, type SeasonLookup } from '@/lib/scoring';
 import { DuplicateImageError, submitCatch, type PostVisibility, type SubmitCatchResult } from '@/lib/submitCatch';
 import { toWeightOz } from '@/lib/units';
 import { generateUuidV4 } from '@/lib/uuid';
@@ -72,7 +72,8 @@ export default function LogCatchScreen() {
   const [venueHidden, setVenueHidden] = useState(false);
   const [visibility, setVisibility] = useState<PostVisibility>('public');
   const [caption, setCaption] = useState('');
-  const [season, setSeason] = useState<SeasonScoring | null>(null);
+  // null while the first lookup is in flight.
+  const [seasonLookup, setSeasonLookup] = useState<SeasonLookup | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -96,18 +97,33 @@ export default function LogCatchScreen() {
     const key = formatDateInput(date);
     if (seasonFetchedForDate.current === key) return;
     seasonFetchedForDate.current = key;
+    setSeasonLookup(null);
     fetchSeasonForDate(date)
-      .then(setSeason)
-      .catch(() => setSeason(null));
+      .then(setSeasonLookup)
+      .catch(() => setSeasonLookup({ state: 'error' }));
   }, []);
 
   // Load once on mount.
   useMemo(() => maybeLoadSeason(caughtAt), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pointsPreview = useMemo(
-    () => (weightOz !== null && season ? computePoints(weightOz, season) : null),
-    [weightOz, season]
+    () =>
+      weightOz !== null && seasonLookup?.state === 'found'
+        ? computePoints(weightOz, seasonLookup.season)
+        : null,
+    [weightOz, seasonLookup]
   );
+
+  /**
+   * A weighed fish dated outside every running season.
+   *
+   * scored_catches only ranks catches whose caught_at falls between the
+   * season's starts_on and ends_on, so this one will be logged, appear on the
+   * feed, and count for nothing. That is a legitimate thing to do in the
+   * closed months — but it has to be said out loud, because the angler's
+   * whole reason for filling this form in is the league.
+   */
+  const outsideSeason = weightOz !== null && seasonLookup?.state === 'none';
 
   const addPickedPhotos = useCallback((picked: PickedCatchPhoto[]) => {
     if (picked.length === 0) return;
@@ -250,6 +266,11 @@ export default function LogCatchScreen() {
     setCatchResultData(null);
     caughtAtEditedRef.current = false;
     prefilledFromExifRef.current = false;
+    // Re-look-up for today. Without clearing the memo the cached answer for
+    // the last catch's date survives the reset, so a fish logged after an
+    // out-of-season one would inherit its warning.
+    seasonFetchedForDate.current = null;
+    maybeLoadSeason(now);
   };
 
   if (authLoading) {
@@ -360,8 +381,16 @@ export default function LogCatchScreen() {
               </View>
             </View>
             {weightOz !== null && (
-              <Text style={[Typography.bodySmall, { color: theme.primary }]}>
-                {pointsPreview !== null ? `≈ ${pointsPreview.toFixed(1)} pts` : 'Points preview unavailable right now'}
+              <Text
+                style={[
+                  Typography.bodySmall,
+                  { color: outsideSeason ? theme.textSecondary : theme.primary },
+                ]}>
+                {pointsPreview !== null
+                  ? `≈ ${pointsPreview.toFixed(1)} pts`
+                  : outsideSeason
+                    ? 'No points — see the date below'
+                    : 'Points preview unavailable right now'}
               </Text>
             )}
             {weightOz === null && (
@@ -381,6 +410,21 @@ export default function LogCatchScreen() {
                 <FormField label="Time (GMT)" value={timeText} onChangeText={handleTimeChange} placeholder="HH:MM" />
               </View>
             </View>
+            {/* Sits directly under the fields that cause it, because the fix
+              * is to correct the date — most often one prefilled from a
+              * library photo's EXIF, which is the camera's date, not the
+              * fish's. */}
+            {outsideSeason && (
+              <View style={[styles.noticeCard, { backgroundColor: theme.surface, borderColor: theme.gold }]}>
+                <Text style={[Typography.bodySmall, { color: theme.text }]}>
+                  {dateText} isn&rsquo;t inside a running season.
+                </Text>
+                <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>
+                  This fish will be posted to your feed, but it won&rsquo;t score or appear in the league
+                  table. If the date came from the photo, check it&rsquo;s the day you caught the fish.
+                </Text>
+              </View>
+            )}
           </View>
 
           <VisibilityPicker value={visibility} onChange={setVisibility} />
@@ -402,7 +446,16 @@ export default function LogCatchScreen() {
 
           {submitError && <Text style={[Typography.bodySmall, { color: theme.danger }]}>{submitError}</Text>}
 
-          <AppButton title="Submit" onPress={handleSubmit} loading={submitting} disabled={!canSubmit} />
+          {/* Not blocked, only named. Logging a fish caught in the closed
+            * months is legitimate and a hard stop would refuse it for half
+            * the year — but the consequence belongs on the button, where it
+            * cannot be scrolled past. */}
+          <AppButton
+            title={outsideSeason ? "Post anyway — won't score" : 'Submit'}
+            onPress={handleSubmit}
+            loading={submitting}
+            disabled={!canSubmit}
+          />
         </ScrollView>
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -419,6 +472,12 @@ const styles = StyleSheet.create({
   centered: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  noticeCard: {
+    borderWidth: 1,
+    borderRadius: Radii.md,
+    padding: Spacing.three,
+    gap: Spacing.one,
   },
   safeArea: {
     flex: 1,

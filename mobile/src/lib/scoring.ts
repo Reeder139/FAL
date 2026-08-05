@@ -8,14 +8,27 @@ export interface SeasonScoring {
   min_qualifying_oz: number;
 }
 
-/** The season covering `caughtAt`, open or running. Null if none — e.g.
- * outside any season's date range, or the only matching season is still a
- * draft. */
-export async function fetchSeasonForDate(caughtAt: Date): Promise<SeasonScoring | null> {
+/**
+ * Why a catch dated `caughtAt` would or wouldn't score.
+ *
+ * `none` and `error` are kept apart deliberately. Both used to arrive as a
+ * null season, which meant a lookup that failed on a flaky connection looked
+ * exactly like a date outside every season — so the screen could say nothing
+ * useful about either. Only `none` is a fact about the catch; `error` is a
+ * fact about the network, and must never be reported to the angler as a
+ * problem with their fish.
+ */
+export type SeasonLookup =
+  | { state: 'found'; season: SeasonScoring; seasonName: string }
+  | { state: 'none' }
+  | { state: 'error' };
+
+/** The season covering `caughtAt`, open or running. */
+export async function fetchSeasonForDate(caughtAt: Date): Promise<SeasonLookup> {
   const dateStr = caughtAt.toISOString().slice(0, 10);
   const { data, error } = await supabase
     .from('seasons')
-    .select('id, scoring_multiplier, scoring_offset_oz, scoring_exponent, min_qualifying_oz')
+    .select('id, name, scoring_multiplier, scoring_offset_oz, scoring_exponent, min_qualifying_oz')
     .in('status', ['open', 'running'])
     .lte('starts_on', dateStr)
     .gte('ends_on', dateStr)
@@ -23,8 +36,11 @@ export async function fetchSeasonForDate(caughtAt: Date): Promise<SeasonScoring 
     .limit(1)
     .maybeSingle();
 
-  if (error) throw error;
-  return data;
+  if (error) return { state: 'error' };
+  if (!data) return { state: 'none' };
+
+  const { name, ...season } = data;
+  return { state: 'found', season, seasonName: name };
 }
 
 /**
