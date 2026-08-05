@@ -7,6 +7,7 @@ import { Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { addEvidencePhoto } from '@/lib/addEvidence';
 import { fetchMyCatchesUnderReview, type CatchUnderReview } from '@/lib/catchReview';
+import { formatDateInput } from '@/lib/dateInput';
 import { formatWeightOz } from '@/lib/units';
 
 /**
@@ -71,7 +72,7 @@ export function UnderReviewBanner() {
       {items.map((item) => (
         <View key={item.catchId} style={[styles.item, { borderColor: theme.border }]}>
           <Text style={[Typography.bodySmall, { color: theme.text }]}>
-            {formatWeightOz(item.weightOz)} · {item.caughtAt.slice(0, 10)}
+            {formatWeightOz(item.weightOz)} · {formatDateInput(new Date(item.caughtAt))}
           </Text>
           {item.reason && (
             <Text style={[Typography.caption, { color: theme.textMuted }]}>{item.reason}</Text>

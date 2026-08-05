@@ -31,6 +31,18 @@ import {
   type PreparedCatchPhoto,
 } from '@/lib/catchPhoto';
 import { fetchCatchResult, type CatchResultData } from '@/lib/catchResult';
+import {
+  DATE_PLACEHOLDER,
+  TIME_PLACEHOLDER,
+  describeDateTimeError,
+  formatDateInput,
+  formatTimeInput,
+  isDateComplete,
+  isTimeComplete,
+  maskDateInput,
+  maskTimeInput,
+  parseDateTimeInput,
+} from '@/lib/dateInput';
 import { computePoints, fetchSeasonForDate, type SeasonLookup } from '@/lib/scoring';
 import { DuplicateImageError, submitCatch, type PostVisibility, type SubmitCatchResult } from '@/lib/submitCatch';
 import { toWeightOz } from '@/lib/units';
@@ -44,17 +56,6 @@ interface PhotoItem {
   preparing: boolean;
   role: MediaRole;
   error: string | null;
-}
-
-function formatDateInput(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-function formatTimeInput(d: Date): string {
-  return d.toISOString().slice(11, 16);
-}
-function parseDateTimeInput(dateStr: string, timeStr: string): Date | null {
-  const d = new Date(`${dateStr}T${timeStr}:00.000Z`);
-  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 export default function LogCatchScreen() {
@@ -75,6 +76,7 @@ export default function LogCatchScreen() {
   // null while the first lookup is in flight.
   const [seasonLookup, setSeasonLookup] = useState<SeasonLookup | null>(null);
 
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [result, setResult] = useState<SubmitCatchResult | null>(null);
@@ -123,7 +125,8 @@ export default function LogCatchScreen() {
    * closed months — but it has to be said out loud, because the angler's
    * whole reason for filling this form in is the league.
    */
-  const outsideSeason = weightOz !== null && seasonLookup?.state === 'none';
+  const outsideSeason =
+    weightOz !== null && seasonLookup?.state === 'none' && describeDateTimeError(dateText, timeText) === null;
 
   const addPickedPhotos = useCallback((picked: PickedCatchPhoto[]) => {
     if (picked.length === 0) return;
@@ -193,36 +196,56 @@ export default function LogCatchScreen() {
     });
 
   const handleDateChange = (text: string) => {
-    setDateText(text);
+    const masked = maskDateInput(text);
+    setDateText(masked);
     caughtAtEditedRef.current = true;
-    const parsed = parseDateTimeInput(text, timeText);
+    const parsed = parseDateTimeInput(masked, timeText);
     if (parsed) {
       setCaughtAt(parsed);
       maybeLoadSeason(parsed);
     }
   };
   const handleTimeChange = (text: string) => {
-    setTimeText(text);
+    const masked = maskTimeInput(text);
+    setTimeText(masked);
     caughtAtEditedRef.current = true;
-    const parsed = parseDateTimeInput(dateText, text);
+    const parsed = parseDateTimeInput(dateText, masked);
     if (parsed) {
       setCaughtAt(parsed);
       maybeLoadSeason(parsed);
     }
   };
 
+  const dateTimeError = describeDateTimeError(dateText, timeText);
+  /* Held back until the entry is finished or submit has been pressed —
+   * complaining about DD/MM/YYYY after the first digit is nagging someone
+   * mid-keystroke. Once all eight digits are in, an impossible date is worth
+   * saying straight away. */
+  const showDateTimeError =
+    dateTimeError !== null &&
+    (submitAttempted || (isDateComplete(dateText) && isTimeComplete(timeText)));
+
   const readyPhotos = photos.filter((p) => p.prepared !== null && !p.error);
   const allPhotosReady = photos.length > 0 && readyPhotos.length === photos.length;
   const canSubmit = allPhotosReady && !submitting;
 
   const handleSubmit = async () => {
+    setSubmitAttempted(true);
     setSubmitError(null);
+
+    /* Re-parsed from the fields rather than trusting the `caughtAt` state,
+     * which only advances on a successful parse. Without this, clearing or
+     * mistyping the date after a good entry would silently submit the last
+     * one that happened to parse — and a catch cannot be edited afterwards. */
+    const parsedCaughtAt = parseDateTimeInput(dateText, timeText);
+    if (dateTimeError !== null || !parsedCaughtAt) return;
+
     setSubmitting(true);
     try {
       const submitResult = await submitCatch({
         caption: caption.trim() || null,
         weightOz,
-        caughtAt,
+        caughtAt: parsedCaughtAt,
         venueId: venue?.venueId ?? null,
         newVenueName: venue?.isNew ? venue.venueName : null,
         venueHidden,
@@ -264,6 +287,7 @@ export default function LogCatchScreen() {
     setCaption('');
     setResult(null);
     setCatchResultData(null);
+    setSubmitAttempted(false);
     caughtAtEditedRef.current = false;
     prefilledFromExifRef.current = false;
     // Re-look-up for today. Without clearing the memo the cached answer for
@@ -404,12 +428,31 @@ export default function LogCatchScreen() {
             <Text style={[Typography.h2, { color: theme.text }]}>Caught</Text>
             <View style={styles.weightRow}>
               <View style={styles.weightField}>
-                <FormField label="Date" value={dateText} onChangeText={handleDateChange} placeholder="YYYY-MM-DD" />
+                <FormField
+                  label="Date"
+                  value={dateText}
+                  onChangeText={handleDateChange}
+                  placeholder={DATE_PLACEHOLDER}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  accessibilityLabel="Date caught, day slash month slash year"
+                />
               </View>
               <View style={styles.weightField}>
-                <FormField label="Time (GMT)" value={timeText} onChangeText={handleTimeChange} placeholder="HH:MM" />
+                <FormField
+                  label="Time"
+                  value={timeText}
+                  onChangeText={handleTimeChange}
+                  placeholder={TIME_PLACEHOLDER}
+                  keyboardType="number-pad"
+                  maxLength={5}
+                  accessibilityLabel="Time caught, 24-hour clock"
+                />
               </View>
             </View>
+            {showDateTimeError && (
+              <Text style={[Typography.bodySmall, { color: theme.danger }]}>{dateTimeError}</Text>
+            )}
             {/* Sits directly under the fields that cause it, because the fix
               * is to correct the date — most often one prefilled from a
               * library photo's EXIF, which is the camera's date, not the
