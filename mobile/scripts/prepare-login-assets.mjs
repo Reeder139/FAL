@@ -13,6 +13,12 @@
 //
 // Not part of the build — assets are committed. Re-run only when the
 // source art changes.
+//
+// The screen's logo is NOT produced here: the Carp Leagues shield needs its
+// black backdrop keyed out, which is a different job entirely, so it has
+// its own script (prepare-carp-leagues-logo.mjs) writing to the same
+// folder. Nothing in this table generates it, and that's deliberate rather
+// than an omission.
 
 import { mkdir, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -29,7 +35,6 @@ const TARGETS = [
   { src: '06_full_background_scene_2160x3840.png', out: 'background.jpg', width: 1080, format: 'jpeg' },
   // The rest keep their alpha channel (rounded corners / cutouts sitting
   // over the background), so they stay PNG — quantized to shrink them.
-  { src: '01_fantasy_fishing_logo.png', out: 'logo.png', width: 512, format: 'png' },
   // "prize box 2" replaces 02_prize_box.png — the gold rework that goes with
   // the Carp Leagues mark. Same copy, 3:2 where the original was 12:7, so
   // PRIZE_BOX_RATIO in welcome.tsx tracks this.
