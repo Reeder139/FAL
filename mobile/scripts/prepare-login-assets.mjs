@@ -30,7 +30,10 @@ const TARGETS = [
   // The rest keep their alpha channel (rounded corners / cutouts sitting
   // over the background), so they stay PNG — quantized to shrink them.
   { src: '01_fantasy_fishing_logo.png', out: 'logo.png', width: 512, format: 'png' },
-  { src: '02_prize_box.png', out: 'prize-box.png', width: 900, format: 'png' },
+  // "prize box 2" replaces 02_prize_box.png — the gold rework that goes with
+  // the Carp Leagues mark. Same copy, 3:2 where the original was 12:7, so
+  // PRIZE_BOX_RATIO in welcome.tsx tracks this.
+  { src: 'prize box 2.png', out: 'prize-box.png', width: 900, format: 'png' },
   { src: '03_login_button.png', out: 'login-button.png', width: 720, format: 'png' },
   { src: '04_register_button.png', out: 'register-button.png', width: 720, format: 'png' },
   { src: '05_bottom_rail.png', out: 'bottom-rail.png', width: 900, format: 'png' },

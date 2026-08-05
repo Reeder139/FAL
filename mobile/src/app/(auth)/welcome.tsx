@@ -25,7 +25,7 @@ import { Colors, MaxContentWidth, Radii, Spacing } from '@/constants/theme';
 // The Carp Leagues shield, prepared square (see
 // scripts/prepare-carp-leagues-logo.mjs).
 const LOGO_RATIO = 1; // 512x512
-const PRIZE_BOX_RATIO = 2400 / 1400;
+const PRIZE_BOX_RATIO = 900 / 600;
 const BUTTON_RATIO = 2400 / 600;
 const BOTTOM_RAIL_RATIO = 2400 / 900;
 // Shared with the tab template's strapline (see components/tag-line.tsx) —
