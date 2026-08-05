@@ -5,7 +5,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FollowButton } from '@/components/follow-button';
 import { PostComments } from '@/components/post-comments';
-import { Radii, Shadows, Spacing, Typography } from '@/constants/theme';
+import { PostWatermark, Radii, Shadows, Spacing, Typography } from '@/constants/theme';
 import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
 import type { FeedItemWithPhoto } from '@/lib/feed';
@@ -79,6 +79,21 @@ export function PostCard({ item, viewerId, followingIds }: PostCardProps) {
       <View style={styles.photoWrapper}>
         {item.photo_url && (
           <Image source={{ uri: item.photo_url }} style={styles.photo} resizeMode="cover" />
+        )}
+        {/* Only where there is a photo to sit on. photoWrapper keeps its
+          * square whether or not one loaded, so an unconditional mark would
+          * float on an empty tile and read as a broken image rather than as
+          * branding.
+          *
+          * accessible={false} because it is the same mark on every post in
+          * the feed — announcing it each time is noise, not information. */}
+        {item.photo_url && (
+          <Image
+            source={require('@/assets/images/login/carp-leagues-logo.png')}
+            style={styles.watermark}
+            resizeMode="contain"
+            accessible={false}
+          />
         )}
         {item.weight_oz !== null && (
           <View style={[styles.weightBadge, { backgroundColor: theme.overlay }]}>
@@ -184,6 +199,18 @@ const styles = StyleSheet.create({
   photo: {
     width: '100%',
     height: '100%',
+  },
+  watermark: {
+    position: 'absolute',
+    top: PostWatermark.inset,
+    right: PostWatermark.inset,
+    width: PostWatermark.size,
+    height: PostWatermark.size,
+    opacity: PostWatermark.opacity,
+    // Decoration sitting over the photo — it must never swallow a tap meant
+    // for what is underneath it. In the style rather than as a prop: Image
+    // has no pointerEvents prop, only View does.
+    pointerEvents: 'none',
   },
   weightBadge: {
     position: 'absolute',

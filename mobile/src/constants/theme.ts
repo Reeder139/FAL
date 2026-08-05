@@ -537,6 +537,22 @@ export const BottomTabInset =
  *  must stay well under  or the fish become unrecognisable
  * slivers — at 18/6 each shows two thirds of itself. */
 export const LeagueFishThumb = { size: 18, overlap: 6 } as const;
+/**
+ * The Carp Leagues mark sitting on each feed photo.
+ *
+ * Small rather than faint is what makes it discreet. The logo is fine gold
+ * detail on a dark shield, and dropping its opacity much below this turns
+ * that detail to mud without making it any less noticeable — so the size
+ * does the work and the opacity only takes the edge off.
+ *
+ * 40 against a photo that is the full card width — about 343 on a 375px
+ * phone — leaves the mark at roughly a ninth of the frame. Legible as a
+ * badge, nowhere near able to compete with the fish.
+ *
+ * Sits opposite the weight badge, which is bottom-left, so the two never
+ * meet whatever the photo is.
+ */
+export const PostWatermark = { size: 40, opacity: 0.85, inset: Spacing.two } as const;
 /** Caps on the welcome screen's artwork, which is otherwise width-driven.
  *
  * Both exist for the same reason: that screen must fit without scrolling,
