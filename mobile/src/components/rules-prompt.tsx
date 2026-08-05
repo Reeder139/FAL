@@ -4,7 +4,7 @@ import { OverlayCard } from '@/components/overlay-card';
 
 /** Source dimensions of the prepared card (see
  * scripts/prepare-rules-assets.mjs). */
-const RULES_RATIO = 1316 / 1129;
+const RULES_RATIO = 771 / 1794;
 
 /** Wider than the upsell cards. This one is read rather than glanced at —
  * eleven numbered rules in small type — so it takes as much of the viewport

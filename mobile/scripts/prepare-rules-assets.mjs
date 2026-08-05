@@ -79,7 +79,7 @@ async function prepareIcon() {
 }
 
 async function prepareCard() {
-  const src = path.join(SRC_DIR, 'Rules pop up.png');
+  const src = path.join(SRC_DIR, 'Rules pop up 1.png');
   const { data, info } = await sharp(src).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width: w, height: h, channels } = info;
 
@@ -111,7 +111,7 @@ async function prepareCard() {
 
   const meta = await sharp(out).metadata();
   console.log(
-    `  Rules pop up.png     card ${right - left + 1}x${bottom - top + 1}` +
+    `  Rules pop up 1.png   card ${right - left + 1}x${bottom - top + 1}` +
       `  ->  rules-card.jpg  ${meta.width}x${meta.height}  ratio ${(meta.width / meta.height).toFixed(3)}  ` +
       `${kb((await stat(src)).size)} -> ${kb((await stat(out)).size)}`
   );

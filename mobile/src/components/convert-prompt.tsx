@@ -18,13 +18,13 @@ type Prompt = {
 const PROMPTS: Prompt[] = [
   {
     source: require('@/assets/images/convert/big-leagues.jpg'),
-    ratio: 1187 / 1094,
+    ratio: 810 / 1662,
     label:
-      'Join the big leagues now to play for six divisional cash prizes and the grand prize of £20,000. Upgrade now and enter to win.',
+      'Join the big leagues now for six divisional cash prizes and the grand prize of £20,000. Real anglers, real competition. Climb the ranks and prove you are the best. Upgrade now and enter to win.',
   },
   {
     source: require('@/assets/images/convert/national-league.jpg'),
-    ratio: 1200 / 1002,
+    ratio: 844 / 1744,
     label:
       "You're playing in the National League with all members, but not in the big leagues for real prizes. Upgrade now to see where you would be placing and start playing for real prizes.",
   },

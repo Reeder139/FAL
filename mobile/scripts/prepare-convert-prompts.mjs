@@ -29,9 +29,12 @@ import sharp from 'sharp';
 const SRC_DIR = path.resolve('..', 'Images');
 const OUT_DIR = path.resolve('assets', 'images', 'convert');
 
+// v3 and v4 of the artwork. The output names are kept — they describe what
+// the card argues, not which file it came from, and 4 is still the Big
+// Leagues pitch while 3 is still the National League one.
 const PROMPTS = [
-  ['Convert to paid pop up.png', 'big-leagues.jpg'],
-  ['convert to paid pop up 2.png', 'national-league.jpg'],
+  ['Convert to paid pop up 4.png', 'big-leagues.jpg'],
+  ['convert to paid pop up 3.png', 'national-league.jpg'],
 ];
 
 /** Widest the card is ever drawn is ~440px, so this is ~2.7x. Not enlarged
