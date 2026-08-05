@@ -27,7 +27,7 @@ let promptShownThisSession = false;
 
 export default function TabsLayout() {
   const theme = useTheme();
-  const { session, loading, needsOnboarding } = useAuth();
+  const { session, loading, needsOnboarding, needsFairPlay } = useAuth();
 
   // Upsell card for members who aren't in the paid competition, shown once a
   // session the first time they land on the League tab. It lives here rather
@@ -60,6 +60,12 @@ export default function TabsLayout() {
 
   if (!session) {
     return <Redirect href="/welcome" />;
+  }
+
+  // Before onboarding: the code governs the catches they are about to start
+  // logging, so agreeing to it cannot come after declaring a PB.
+  if (needsFairPlay) {
+    return <Redirect href="/fair-play" />;
   }
 
   if (needsOnboarding) {

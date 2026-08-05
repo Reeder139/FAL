@@ -26,7 +26,7 @@ import { useAuth } from '@/providers/auth-provider';
 export default function OnboardingScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { session, loading: authLoading, needsOnboarding, refreshProfile } = useAuth();
+  const { session, loading: authLoading, needsOnboarding, needsFairPlay, refreshProfile } = useAuth();
 
   const [lb, setLb] = useState('');
   const [oz, setOz] = useState('');
@@ -48,6 +48,12 @@ export default function OnboardingScreen() {
   }
 
   // Already onboarded (declared_pb_oz is set) — nothing left to do here.
+  // The code comes first — it governs the catches this screen is about to
+  // start collecting a baseline for.
+  if (needsFairPlay) {
+    return <Redirect href="/fair-play" />;
+  }
+
   if (!needsOnboarding) {
     return <Redirect href="/" />;
   }

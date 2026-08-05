@@ -20,6 +20,10 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="(auth)" />
+          {/* Between registering and onboarding. Not in (auth): the angler
+            * already has a session by this point, and that layout sends
+            * anyone holding one to the feed. */}
+          <Stack.Screen name="fair-play" />
           <Stack.Screen name="onboarding" />
           {/* Presented as a modal, outside the tabs navigator, so the tab
            * bar is naturally hidden while it's open — reserved for focused

@@ -19,6 +19,8 @@ export interface Profile {
   display_name: string;
   avatar_path: string | null;
   declared_pb_oz: number | null;
+  country: string | null;
+  fair_play_accepted_at: string | null;
   pb_verified: boolean;
   is_admin: boolean;
   follower_count: number;
@@ -32,6 +34,10 @@ interface AuthContextValue {
   loading: boolean;
   /** True once signed in but before onboarding (declared_pb_oz) is set. */
   needsOnboarding: boolean;
+  /** True once signed in but before the Fair Play Code has been agreed.
+   * Checked before onboarding — the code governs what you are about to
+   * start logging, so it comes first. */
+  needsFairPlay: boolean;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -41,7 +47,9 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, display_name, avatar_path, declared_pb_oz, pb_verified, is_admin, follower_count, following_count')
+    .select(
+      'id, username, display_name, avatar_path, declared_pb_oz, pb_verified, is_admin, follower_count, following_count, country, fair_play_accepted_at'
+    )
     .eq('id', userId)
     .single();
 
@@ -100,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       loading,
       needsOnboarding: !!session && profile !== null && profile.declared_pb_oz === null,
+      needsFairPlay: !!session && profile !== null && profile.fair_play_accepted_at === null,
       refreshProfile,
       signOut,
     }),

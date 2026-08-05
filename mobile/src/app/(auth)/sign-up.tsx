@@ -4,8 +4,10 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/app-button';
+import { CountryPicker } from '@/components/country-picker';
 import { FormField } from '@/components/form-field';
 import { MaxContentWidth, Spacing, Typography } from '@/constants/theme';
+import { DEFAULT_COUNTRY } from '@/constants/countries';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 
@@ -24,6 +26,7 @@ export default function SignUpScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [checkEmailMessage, setCheckEmailMessage] = useState<string | null>(null);
@@ -74,7 +77,10 @@ export default function SignUpScreen() {
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: { username, display_name: displayName.trim() } },
+      // Country rides in the metadata because the profile row is written by
+      // the on_auth_user_created trigger, not by this client — see
+      // handle_new_user(), which copies it across.
+      options: { data: { username, display_name: displayName.trim(), country } },
     });
 
     setLoading(false);
@@ -91,8 +97,9 @@ export default function SignUpScreen() {
       return;
     }
 
-    // Session exists — AuthProvider picks it up and (auth)/_layout redirects
-    // to /onboarding automatically (declared_pb_oz is still null at this point).
+    // Session exists — AuthProvider picks it up, (auth)/_layout sends them to
+    // the feed, and the tabs layout bounces them to /fair-play, which is
+    // where registration actually completes.
   };
 
   return (
@@ -137,6 +144,10 @@ export default function SignUpScreen() {
             labelAccessory={hint && <Text style={[Typography.caption, { color: hint.color }]}>{hint.text}</Text>}
           />
           <FormField label="Display name" value={displayName} onChangeText={setDisplayName} />
+          {/* Not used for anything yet — leagues are UK-only. Collected now
+            * because asking every existing member later is far harder than
+            * asking each new one once. */}
+          <CountryPicker label="Country" value={country} onChange={setCountry} />
 
           {error && <Text style={[Typography.bodySmall, { color: theme.danger }]}>{error}</Text>}
           {checkEmailMessage && (
