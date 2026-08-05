@@ -7,7 +7,7 @@ import { CatchGrid } from '@/components/catch-grid';
 import { ProfileHeader } from '@/components/profile-header';
 import { TabScreen } from '@/components/tab-screen';
 import { UnderReviewBanner } from '@/components/under-review-banner';
-import { BottomTabInset, MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
+import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { pickAndUploadAvatar } from '@/lib/avatarUpload';
 import { fetchBestVerifiedCatchOz, personalBest } from '@/lib/personalBest';
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: Spacing.two,
     paddingHorizontal: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.four,
+    paddingBottom: Spacing.four,
     gap: Spacing.two,
   },
   topRow: {

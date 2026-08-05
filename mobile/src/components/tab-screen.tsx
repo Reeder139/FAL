@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LeagueStripBar } from '@/components/league-strip-bar';
 import { TagLine } from '@/components/tag-line';
+import { BottomTabInset } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type TabScreenProps = {
@@ -32,7 +33,14 @@ export function TabScreen({ children, centered }: TabScreenProps) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <SafeAreaView style={[styles.safeArea, centered && styles.centered]}>
+      {/* The nav bar is position:absolute at the bottom, so it covers whatever
+        * is underneath it rather than displacing it. Insetting here ends the
+        * content area — and so any list inside it — just above the bar, which
+        * is why a screen's own last item stays reachable without every screen
+        * having to remember to pad itself. Doing it in the shell is the same
+        * argument as the League strip and the strapline living here. */}
+      <SafeAreaView
+        style={[styles.safeArea, { paddingBottom: BottomTabInset }, centered && styles.centered]}>
         <LeagueStripBar />
         <TagLine />
         {children}

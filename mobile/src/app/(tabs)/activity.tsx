@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { TabScreen } from '@/components/tab-screen';
-import { BottomTabInset, MaxContentWidth, Spacing, Typography } from '@/constants/theme';
+import { MaxContentWidth, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function ActivityScreen() {
@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     padding: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.four,
+    paddingBottom: Spacing.four,
     gap: Spacing.six,
   },
   emptyState: {

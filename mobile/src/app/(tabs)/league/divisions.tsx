@@ -5,7 +5,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { TabScreen } from '@/components/tab-screen';
 import {
-  BottomTabInset,
   Colors,
   DivisionWash,
   MaxContentWidth,
@@ -176,7 +175,7 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     padding: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.four,
+    paddingBottom: Spacing.four,
     gap: Spacing.three,
   },
   wash: {

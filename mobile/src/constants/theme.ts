@@ -402,7 +402,6 @@ export const InputStyle = {
 // ---------------------------------------------------------------------------
 // LAYOUT
 // ---------------------------------------------------------------------------
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
 /** Suggested-follows rail on the feed. Sized to fit a circular avatar plus
  * the name and division lines and the follow button beneath it.
@@ -489,6 +488,42 @@ export const NavIconWide = { width: 54, height: 33 } as const;
  * — the bar takes its row height from its tallest child, so a taller divider
  * would silently deepen the whole bar. */
 export const NavDividerSize = { width: 1, height: 30 } as const;
+/**
+ * How much room a tab screen has to leave at the bottom for the nav bar.
+ *
+ * The bar is `position: absolute; bottom: 0`, so it reserves no space itself.
+ * Anything that scrolls has to keep clear of it, or its last item ends up
+ * underneath and cannot be reached.
+ *
+ * Web had no entry here at all, so `Platform.select` fell through to the
+ * `?? 0` and every tab screen reserved nothing. The symptom was the bottom
+ * post on the feed: visible, but its comments sat under the bar with no way
+ * to scroll to them.
+ *
+ * The web figure is derived rather than measured and frozen, because the
+ * bar's depth follows from NavIconSize — as that token's own note says.
+ * It is the bar's top padding, plus the icon row's vertical padding, plus
+ * each item's vertical padding, plus the icon:
+ *
+ *   Spacing.three + (Spacing.two * 2) + (Spacing.two * 2) + NavIconSize
+ *   16           + 16                + 16                + 42          = 90
+ *
+ * The Catch button sits inside that and needs no clearance of its own: 64px
+ * tall at Spacing.four from the bottom reaches 88, just under the bar's 90.
+ *
+ * iOS and Android keep their measured constants. The native tab bar's real
+ * height isn't something the JS side can read, which is the whole reason
+ * this token exists rather than a layout measurement.
+ *
+ * Declared after NavIconSize because it is computed from it — a `const` used
+ * before its initialiser throws at module load, not at build.
+ */
+export const BottomTabInset =
+  Platform.select({
+    ios: 50,
+    android: 80,
+    web: Spacing.three + Spacing.two * 4 + NavIconSize,
+  }) ?? 0;
 /** Thumbnails of an angler's counting fish in a league table row, and how
  * far each one tucks under the previous.
  *

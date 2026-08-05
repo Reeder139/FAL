@@ -6,7 +6,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { AppButton } from '@/components/app-button';
 import { FormField } from '@/components/form-field';
 import { TabScreen } from '@/components/tab-screen';
-import { BottomTabInset, MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
+import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchMyThreads, openThread, type SupportStatus, type SupportThread } from '@/lib/support';
 
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     padding: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.four,
+    paddingBottom: Spacing.four,
     gap: Spacing.three,
   },
   header: {

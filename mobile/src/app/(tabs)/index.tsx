@@ -9,7 +9,6 @@ import { SuggestedAnglersList } from '@/components/suggested-anglers';
 import { SuggestedFollowsRail } from '@/components/suggested-follows-rail';
 import { TabScreen } from '@/components/tab-screen';
 import {
-  BottomTabInset,
   ButtonVariants,
   MaxContentWidth,
   RulesIconSize,
@@ -228,7 +227,7 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     padding: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
+    paddingBottom: Spacing.three,
     gap: Spacing.three,
   },
   footerLoader: {

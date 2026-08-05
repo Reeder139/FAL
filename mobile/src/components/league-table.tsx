@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NativeScrollEvent, NativeSyntheticEvent, View as ViewType } from 'react-native';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { BottomTabInset, LeagueFishThumb, Radii, Spacing, Typography } from '@/constants/theme';
+import { LeagueFishThumb, Radii, Spacing, Typography } from '@/constants/theme';
 import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchLeagueTableWithGhost, type LeagueTableRow } from '@/lib/leagueTable';
@@ -161,7 +161,7 @@ type LeagueTableProps = {
 
 /** Bottom padding on the list, needed to back out the row pitch from the
  * reported content height. Must match `styles.list`. */
-const LIST_PADDING_BOTTOM = BottomTabInset + Spacing.four;
+const LIST_PADDING_BOTTOM = Spacing.four;
 const ROW_GAP = Spacing.one;
 
 export function LeagueTable({ divisionId, showDivisionBadge = false }: LeagueTableProps) {
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: Spacing.one,
-    paddingBottom: BottomTabInset + Spacing.four,
+    paddingBottom: Spacing.four,
   },
   row: {
     flexDirection: 'row',
