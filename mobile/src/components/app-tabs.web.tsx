@@ -13,7 +13,14 @@ import { useTheme } from '@/hooks/use-theme';
 // the FAB (plus its glow) in the middle of the tab row so it never sits on
 // top of a real tab, splitting the triggers into a left/right group either
 // side of it.
-const FAB_CLEARANCE = FAB_SIZE + Spacing.two;
+//
+// The padding either side of FAB_SIZE is what separates the button from the
+// two rules flanking it, since those sit hard against this gap's edges. At
+// Spacing.two the rules cleared the button by 4px and read as boxing it in;
+// Spacing.five gives them room to read as separators instead. Every pixel
+// here comes off the tab groups, so it trades against icon width — see
+// NavIconSize, which is already bounded by tab width rather than height.
+const FAB_CLEARANCE = FAB_SIZE + Spacing.five;
 const LEFT_TAB_COUNT = 2;
 
 export default function AppTabs() {
