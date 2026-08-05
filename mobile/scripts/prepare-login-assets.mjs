@@ -36,7 +36,6 @@ const TARGETS = [
   { src: 'prize box 2.png', out: 'prize-box.png', width: 900, format: 'png' },
   { src: '03_login_button.png', out: 'login-button.png', width: 720, format: 'png' },
   { src: '04_register_button.png', out: 'register-button.png', width: 720, format: 'png' },
-  { src: '05_bottom_rail.png', out: 'bottom-rail.png', width: 900, format: 'png' },
 ];
 
 const kb = (bytes) => `${(bytes / 1024).toFixed(0)}KB`;
