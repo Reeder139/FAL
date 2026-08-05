@@ -2282,6 +2282,12 @@ end; $$;
 create unique index if not exists seasons_one_running
   on seasons ((status)) where status = 'running';
 
+-- One season per name. Nothing else was unique on this table, so a second
+-- "Summer 2029" was possible — and two seasons covering the same dates is not
+-- cosmetic: fetchSeasonForDate() takes `limit 1`, so which one a catch is
+-- scored against would come down to sort order.
+alter table seasons add constraint seasons_name_key unique (name);
+
 create or replace function public.create_season(
   p_name          text,
   p_starts_on     date,
