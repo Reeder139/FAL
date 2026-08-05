@@ -60,6 +60,63 @@ export async function fetchComments(postId: string): Promise<PostComment[]> {
   });
 }
 
+/** How many comments sit under a post in the feed before the expand link.
+ * Two is what fits without the comments outweighing the photo they are
+ * about. */
+export const FEED_COMMENT_PREVIEW = 2;
+
+/**
+ * The last few comments on each of a page of posts, batched.
+ *
+ * One RPC for the whole page rather than a query per card — twenty posts
+ * would otherwise be twenty round trips on every scroll — and the slicing
+ * happens in the database, so a post with four hundred comments still costs
+ * two rows.
+ */
+export async function fetchRecentCommentsForPosts(
+  postIds: string[],
+  perPost: number = FEED_COMMENT_PREVIEW
+): Promise<Map<string, PostComment[]>> {
+  const byPost = new Map<string, PostComment[]>();
+  if (postIds.length === 0) return byPost;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data, error } = await supabase.rpc('recent_comments_for_posts', {
+    p_post_ids: postIds,
+    p_limit: perPost,
+  });
+  if (error) throw error;
+
+  for (const row of (data ?? []) as RecentCommentRow[]) {
+    const list = byPost.get(row.post_id) ?? [];
+    list.push({
+      id: row.id,
+      postId: row.post_id,
+      authorId: row.author_id,
+      username: row.username ?? 'someone',
+      avatarUrl: row.avatar_path ? getPublicStorageUrl('post-media', row.avatar_path) : null,
+      body: row.body,
+      createdAt: row.created_at,
+      isMine: !!user && row.author_id === user.id,
+    });
+    byPost.set(row.post_id, list);
+  }
+  return byPost;
+}
+
+interface RecentCommentRow {
+  post_id: string;
+  id: string;
+  author_id: string;
+  username: string | null;
+  avatar_path: string | null;
+  body: string;
+  created_at: string;
+}
+
 export async function addComment(postId: string, body: string): Promise<void> {
   const {
     data: { user },

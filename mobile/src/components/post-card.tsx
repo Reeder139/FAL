@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FollowButton } from '@/components/follow-button';
+import { PostComments } from '@/components/post-comments';
 import { Radii, Shadows, Spacing, Typography } from '@/constants/theme';
 import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
@@ -21,7 +21,6 @@ type PostCardProps = {
 
 export function PostCard({ item, viewerId, followingIds }: PostCardProps) {
   const theme = useTheme();
-  const router = useRouter();
   const openAngler = useOpenAngler();
   const [liked, setLiked] = useState(item.liked_by_viewer);
   const [likeCount, setLikeCount] = useState(item.like_count);
@@ -115,18 +114,22 @@ export function PostCard({ item, viewerId, followingIds }: PostCardProps) {
             <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>{likeCount}</Text>
           </Pressable>
 
-          <Pressable
-            onPress={() => router.push({ pathname: '/comments', params: { postId: item.post_id } })}
-            hitSlop={Spacing.two}
-            accessibilityRole="button"
-            accessibilityLabel={`Comments on ${item.username}'s post`}
-            style={styles.commentButton}>
+          <View style={styles.commentButton}>
             <Ionicons name="chatbubble-outline" size={16} color={theme.textSecondary} />
             <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>
               {item.comment_count} {item.comment_count === 1 ? 'comment' : 'comments'}
             </Text>
-          </Pressable>
+          </View>
         </View>
+
+        {/* Under the photo, not behind a route. A comment is about the
+          * picture directly above it. */}
+        <PostComments
+          postId={item.post_id}
+          preview={item.recent_comments}
+          commentCount={item.comment_count}
+          viewerId={viewerId}
+        />
       </View>
     </View>
   );

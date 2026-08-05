@@ -1,3 +1,4 @@
+import { fetchRecentCommentsForPosts, type PostComment } from '@/lib/comments';
 import { fetchLikedPostIds } from '@/lib/likes';
 import { getPublicStorageUrl } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
@@ -31,6 +32,10 @@ export interface FeedItemWithPhoto extends FeedItem {
   /** Whether the signed-in angler has already liked this post. Resolved
    * here, one query per page, so a card never has to ask for itself. */
   liked_by_viewer: boolean;
+  /** The last couple of comments, for the preview under the photo. Fetched
+   * with the page for the same reason as the likes: a card that fetched its
+   * own would make a twenty-post page twenty round trips. */
+  recent_comments: PostComment[];
 }
 
 export type FeedTab = 'following' | 'all' | 'league';
@@ -76,9 +81,10 @@ export async function fetchFeedPage(tab: FeedTab, cursor: string | null): Promis
 
   // Both in parallel: neither depends on the other, and the feed already
   // waits on the page query before either can start.
-  const [{ data: media, error: mediaError }, likedPostIds] = await Promise.all([
+  const [{ data: media, error: mediaError }, likedPostIds, commentsByPost] = await Promise.all([
     supabase.from('post_media').select('post_id, storage_path').in('post_id', postIds).eq('media_role', 'hero'),
     fetchLikedPostIds(postIds),
+    fetchRecentCommentsForPosts(postIds),
   ]);
   if (mediaError) throw mediaError;
 
@@ -91,6 +97,7 @@ export async function fetchFeedPage(tab: FeedTab, cursor: string | null): Promis
       ? getPublicStorageUrl('post-media', heroPathByPost.get(row.post_id)!)
       : null,
     liked_by_viewer: likedPostIds.has(row.post_id),
+    recent_comments: commentsByPost.get(row.post_id) ?? [],
   }));
 
   return {
