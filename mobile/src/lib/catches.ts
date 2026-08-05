@@ -32,10 +32,16 @@ export async function fetchAnglerCatches(anglerId: string): Promise<AnglerCatch[
   } = await supabase.auth.getUser();
   const isOwnProfile = user?.id === anglerId;
 
+  // The inner join on posts is what keeps deleted catches out of the grid.
+  // `catches` has no deleted_at of its own — deletion lives on the post — so
+  // querying catches alone returns them, and they render as a tile with a
+  // weight and no image: post_media's select policy hides media whose post is
+  // deleted, so the photo goes and the row doesn't.
   const { data: rows, error } = await supabase
     .from('catches')
-    .select('id, post_id, weight_oz, caught_at, venue_id, venue_hidden, status')
+    .select('id, post_id, weight_oz, caught_at, venue_id, venue_hidden, status, posts!inner(deleted_at)')
     .eq('angler_id', anglerId)
+    .is('posts.deleted_at', null)
     .order('caught_at', { ascending: false });
   if (error) throw error;
   if (!rows || rows.length === 0) return [];
