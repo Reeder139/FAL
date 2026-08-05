@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NativeScrollEvent, NativeSyntheticEvent, View as ViewType } from 'react-native';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { BottomTabInset, Radii, Spacing, Typography } from '@/constants/theme';
+import { BottomTabInset, LeagueFishThumb, Radii, Spacing, Typography } from '@/constants/theme';
 import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchLeagueTableWithGhost, type LeagueTableRow } from '@/lib/leagueTable';
@@ -30,6 +30,25 @@ function JoinPill({ onPress }: { onPress: () => void }) {
       </Text>
     </Pressable>
   );
+}
+
+/**
+ * The "N fish · best X" line under an angler's name.
+ *
+ * The count is dropped when a thumbnail is showing for every counting fish,
+ * because then the strip already says how many there are and repeating it
+ * costs width the line hasn't got — five thumbnails leave it too narrow for
+ * both, and the weight is the part the count can't convey.
+ *
+ * It stays whenever the strip is short of the full set, which is the common
+ * case: only catches logged with a photo get a thumbnail, so "5 fish" beside
+ * two pictures is telling you something the pictures don't.
+ */
+function scoringSummary(row: LeagueTableRow): string {
+  const best = row.bestFishOz !== null ? `best ${formatWeightOz(row.bestFishOz)}` : '';
+  const complete = row.countingFishPhotos.length === row.countingFish;
+  if (complete && best) return best;
+  return `${row.countingFish} fish${best ? ` · ${best}` : ''}`;
 }
 
 type RowProps = {
@@ -71,6 +90,33 @@ function TableRow({ row, showDivisionBadge, onJoin }: RowProps) {
         )}
       </Pressable>
 
+      {/* The counting fish, next to the angler they belong to. Not tappable:
+        * the whole strip would otherwise compete with the name beside it for
+        * taps on a row that's already only 36px tall, and the fish are here
+        * as a glance at what earned the position, not as navigation.
+        *
+        * Never on a ghost row. That row already spends its name line on the
+        * Join call-to-action, and the strip on top of it left the name
+        * showing 31px of 71 ("ree…") and the CTA a third of itself — which
+        * defeats the only thing a ghost row is there to do. The same angler
+        * keeps their strip in the national table, where they take an
+        * ordinary numbered row with no pill. */}
+      {row.countingFishPhotos.length > 0 && !row.isGhost && (
+        <View
+          style={styles.fishStrip}
+          accessibilityRole="image"
+          accessibilityLabel={`${row.countingFishPhotos.length} of ${row.username}'s counting fish`}>
+          {row.countingFishPhotos.map((uri, i) => (
+            <Image
+              key={uri}
+              source={{ uri }}
+              style={[styles.fishThumb, { borderColor: theme.surface }, i > 0 && styles.fishThumbTucked]}
+              resizeMode="cover"
+            />
+          ))}
+        </View>
+      )}
+
       <View style={styles.rowInfo}>
         <View style={styles.rowNameLine}>
           {/* The name is its own target, with the Join pill left a sibling
@@ -94,9 +140,7 @@ function TableRow({ row, showDivisionBadge, onJoin }: RowProps) {
             </View>
           )}
           <Text style={[Typography.caption, { color: theme.textMuted }]} numberOfLines={1}>
-            {hasScored
-              ? `${row.countingFish} fish${row.bestFishOz !== null ? ` · best ${formatWeightOz(row.bestFishOz)}` : ''}`
-              : 'Log a catch to see where you’d stand'}
+            {hasScored ? scoringSummary(row) : 'Log a catch to see where you’d stand'}
           </Text>
         </View>
       </View>
@@ -301,6 +345,26 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: Radii.circle,
+  },
+  fishStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    // Must not grow: this sits between the avatar and the name, and letting
+    // it take the row's slack would push the name off rather than the other
+    // way round. Five thumbs is the ceiling anyway (counting_fish).
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  fishThumb: {
+    width: LeagueFishThumb.size,
+    height: LeagueFishThumb.size,
+    borderRadius: Radii.xs,
+    // The rim is what keeps two overlapping fish from reading as one
+    // smeared image. Coloured from the row's own surface at the call site.
+    borderWidth: 1,
+  },
+  fishThumbTucked: {
+    marginLeft: -LeagueFishThumb.overlap,
   },
   rowInfo: {
     flex: 1,

@@ -461,6 +461,19 @@ export const NavIconWide = { width: 54, height: 33 } as const;
  * — the bar takes its row height from its tallest child, so a taller divider
  * would silently deepen the whole bar. */
 export const NavDividerSize = { width: 1, height: 30 } as const;
+/** Thumbnails of an angler's counting fish in a league table row, and how
+ * far each one tucks under the previous.
+ *
+ * Overlapped rather than spaced, because five of them sit between the
+ * avatar and the name on a 375px row and the alternative is measurably
+ * worse: laid out end to end at this size the strip is 98px and the
+ * "best 45lb 3oz" line beneath the name truncates. Tucked, the same five
+ * come to 66px and it fits. It also reads as one stack of photos belonging
+ * to the angler rather than five loose squares.
+ *
+ *  must stay well under  or the fish become unrecognisable
+ * slivers — at 18/6 each shows two thirds of itself. */
+export const LeagueFishThumb = { size: 18, overlap: 6 } as const;
 /** Caps on the welcome screen's artwork, which is otherwise width-driven.
  *
  * Both exist for the same reason: that screen must fit without scrolling,

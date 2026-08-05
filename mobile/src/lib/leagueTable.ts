@@ -21,6 +21,11 @@ export interface LeagueTableRow {
    * the `open` tier. Rendered greyed out and unnumbered. */
   isGhost: boolean;
   isYou: boolean;
+  /** Hero photos of this angler's counting fish, heaviest-scoring first —
+   * 0 to the season's `counting_fish`. Short by design: only catches that
+   * were logged with a photo contribute one, so an angler with five
+   * counting fish and two photos gets two. */
+  countingFishPhotos: string[];
 }
 
 interface RawRow {
@@ -72,7 +77,10 @@ export async function fetchLeagueTableWithGhost(divisionId: string | null): Prom
     position: row.position_in_table,
     isGhost: row.is_ghost,
     isYou: row.is_you,
+    countingFishPhotos: [],
   }));
+
+  await attachCountingFishPhotos(rows);
 
   // Sorted on points, not position: unnumbered rows have no position to sort
   // by, and points is what the order actually means in both modes. The
@@ -80,4 +88,100 @@ export async function fetchLeagueTableWithGhost(divisionId: string | null): Prom
   // in place. Ghost first on an exact tie, matching how its position used to
   // be derived ("one more than everyone strictly ahead of it").
   return rows.sort((a, b) => b.points - a.points || Number(b.isGhost) - Number(a.isGhost));
+}
+
+/** Postgrest puts the `in` list in the query string, so a table the size of
+ * a full national league would build a URL long enough to be rejected.
+ * Split and rejoin. */
+const IN_CHUNK = 60;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+async function selectIn<T>(
+  table: string,
+  columns: string,
+  column: string,
+  values: string[],
+  refine?: (q: any) => any
+): Promise<T[]> {
+  const pages = await Promise.all(
+    chunk(values, IN_CHUNK).map(async (slice) => {
+      let query = supabase.from(table).select(columns).in(column, slice);
+      if (refine) query = refine(query);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []) as T[];
+    })
+  );
+  return pages.flat();
+}
+
+/**
+ * Fills in `countingFishPhotos` for every row, in three batched queries
+ * rather than per-row — a national table is 50+ anglers and an N+1 here
+ * would be 50+ round trips on every load.
+ *
+ * The chain is scored_catches -> catches -> post_media, because
+ * scored_catches carries the rank that decides which fish are counting but
+ * not the post the photo hangs off, and there's no direct join from a catch
+ * to its media (both reference the post, not each other).
+ */
+async function attachCountingFishPhotos(rows: LeagueTableRow[]): Promise<void> {
+  for (const row of rows) row.countingFishPhotos = [];
+  if (rows.length === 0) return;
+
+  // The cap comes from the season, not a constant: counting_fish is one of
+  // the tunables that re-scores every leaderboard when it changes.
+  const { data: season } = await supabase
+    .from('seasons')
+    .select('counting_fish')
+    .eq('status', 'running')
+    .maybeSingle();
+  const cap = season?.counting_fish;
+  if (!cap) return;
+
+  const anglerIds = [...new Set(rows.map((r) => r.anglerId))];
+  const scored = await selectIn<{ catch_id: string; angler_id: string; rank_in_season: number }>(
+    'scored_catches',
+    'catch_id, angler_id, rank_in_season',
+    'angler_id',
+    anglerIds,
+    (q) => q.lte('rank_in_season', cap)
+  );
+  if (scored.length === 0) return;
+
+  const catches = await selectIn<{ id: string; post_id: string }>(
+    'catches',
+    'id, post_id',
+    'id',
+    scored.map((s) => s.catch_id)
+  );
+  const postIdByCatch = new Map(catches.map((c) => [c.id, c.post_id]));
+
+  const media = await selectIn<{ post_id: string; storage_path: string }>(
+    'post_media',
+    'post_id, storage_path',
+    'post_id',
+    [...new Set(catches.map((c) => c.post_id))],
+    (q) => q.eq('media_role', 'hero')
+  );
+  const pathByPost = new Map(media.map((m) => [m.post_id, m.storage_path]));
+
+  // Best-scoring first, so the strip reads in the same order as the fish
+  // that earned the position.
+  const byAngler = new Map<string, string[]>();
+  for (const s of [...scored].sort((a, b) => a.rank_in_season - b.rank_in_season)) {
+    const postId = postIdByCatch.get(s.catch_id);
+    const path = postId ? pathByPost.get(postId) : undefined;
+    if (!path) continue;
+    const list = byAngler.get(s.angler_id) ?? [];
+    list.push(getPublicStorageUrl('post-media', path));
+    byAngler.set(s.angler_id, list);
+  }
+
+  for (const row of rows) row.countingFishPhotos = byAngler.get(row.anglerId) ?? [];
 }
