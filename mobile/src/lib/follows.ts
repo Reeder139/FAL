@@ -1,4 +1,5 @@
 import { getPublicStorageUrl } from '@/lib/storage';
+import { fetchBestVerifiedCatchOz, personalBest, type PersonalBest } from '@/lib/personalBest';
 import { supabase } from '@/lib/supabase';
 
 export async function followAngler(followeeId: string): Promise<void> {
@@ -43,7 +44,11 @@ export interface AnglerProfile {
   username: string;
   displayName: string;
   avatarUrl: string | null;
+  /** The declaration made at onboarding. Kept for division context — use
+   *  for anything the angler would call their PB. */
   declaredPbOz: number | null;
+  /** Declaration vs. best verified catch, resolved. See lib/personalBest. */
+  pb: PersonalBest;
   pbVerified: boolean;
   followerCount: number;
   followingCount: number;
@@ -59,7 +64,7 @@ export async function fetchAnglerProfile(anglerId: string): Promise<AnglerProfil
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: followRow }] = await Promise.all([
+  const [{ data: profile }, { data: followRow }, bestVerifiedOz] = await Promise.all([
     supabase
       .from('profiles')
       .select('id, username, display_name, avatar_path, declared_pb_oz, pb_verified, follower_count, following_count')
@@ -73,6 +78,10 @@ export async function fetchAnglerProfile(anglerId: string): Promise<AnglerProfil
           .eq('followee_id', anglerId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    // In parallel with the profile row: the displayed PB is the heavier of
+    // the declaration and this, and declared_pb_oz alone goes stale the
+    // moment someone lands a bigger fish.
+    fetchBestVerifiedCatchOz(anglerId),
   ]);
   if (!profile) return null;
 
@@ -82,6 +91,7 @@ export async function fetchAnglerProfile(anglerId: string): Promise<AnglerProfil
     displayName: profile.display_name,
     avatarUrl: profile.avatar_path ? getPublicStorageUrl('post-media', profile.avatar_path) : null,
     declaredPbOz: profile.declared_pb_oz,
+    pb: personalBest(profile.declared_pb_oz, bestVerifiedOz),
     pbVerified: profile.pb_verified,
     followerCount: profile.follower_count,
     followingCount: profile.following_count,

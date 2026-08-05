@@ -6,6 +6,7 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'rea
 import { FollowButton } from '@/components/follow-button';
 import { Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import type { PersonalBest } from '@/lib/personalBest';
 import { formatWeightOz } from '@/lib/units';
 
 type ProfileHeaderProps = {
@@ -13,7 +14,11 @@ type ProfileHeaderProps = {
   avatarUrl: string | null;
   displayName: string;
   username: string;
-  declaredPbOz: number | null;
+  /** Resolved PB — declaration vs. best verified catch. See lib/personalBest
+   * for why the declaration alone is the wrong thing to show. */
+  pb: PersonalBest;
+  /** Whether the *declaration* has been evidenced. Only meaningful when the
+   * declaration is what set the PB; a verified catch speaks for itself. */
   pbVerified: boolean;
   followerCount: number;
   followingCount: number;
@@ -39,7 +44,7 @@ export function ProfileHeader({
   avatarUrl,
   displayName,
   username,
-  declaredPbOz,
+  pb,
   pbVerified,
   followerCount,
   followingCount,
@@ -119,14 +124,20 @@ export function ProfileHeader({
         />
       )}
 
-      {declaredPbOz !== null && (
+      {pb.oz !== null && (
         <View style={[styles.pbCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[Typography.label, { color: theme.label }]}>Personal best</Text>
-          <Text style={[Typography.statValue, { color: theme.text }]}>{formatWeightOz(declaredPbOz)}</Text>
+          <Text style={[Typography.statValue, { color: theme.text }]}>{formatWeightOz(pb.oz)}</Text>
+          {/* Three states, not two. A PB set by a verified catch is already
+            * evidenced, so prompting for evidence there would be nonsense —
+            * the nudge only applies while an unproven declaration is still
+            * the biggest number the angler has. */}
           <Text style={[Typography.caption, { color: theme.textMuted }]}>
-            {pbVerified
-              ? 'Verified'
-              : 'Unverified — an evidence-backed PB can move you into an easier division'}
+            {pb.fromVerifiedCatch
+              ? 'From a verified catch'
+              : pbVerified
+                ? 'Verified'
+                : 'Unverified — an evidence-backed PB can move you into an easier division'}
           </Text>
         </View>
       )}

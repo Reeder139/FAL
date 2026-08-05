@@ -61,7 +61,7 @@ export default function AnglerProfileScreen() {
             avatarUrl={angler.avatarUrl}
             displayName={angler.displayName}
             username={angler.username}
-            declaredPbOz={angler.declaredPbOz}
+            pb={angler.pb}
             pbVerified={angler.pbVerified}
             followerCount={angler.followerCount}
             followingCount={angler.followingCount}

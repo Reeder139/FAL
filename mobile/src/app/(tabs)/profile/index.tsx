@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { CatchGrid } from '@/components/catch-grid';
@@ -8,6 +8,7 @@ import { TabScreen } from '@/components/tab-screen';
 import { BottomTabInset, MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { pickAndUploadAvatar } from '@/lib/avatarUpload';
+import { fetchBestVerifiedCatchOz, personalBest } from '@/lib/personalBest';
 import { getPublicStorageUrl } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
@@ -17,6 +18,22 @@ export default function ProfileScreen() {
   const { profile, signOut, refreshProfile } = useAuth();
   const [changingAvatar, setChangingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [bestVerifiedOz, setBestVerifiedOz] = useState<number | null>(null);
+
+  // Fetched here rather than carried on the auth profile: the auth row is
+  // cached for the session, and a PB that only refreshed on sign-in is the
+  // bug this is fixing. Re-runs whenever the profile is refreshed, which is
+  // what a newly verified catch goes through.
+  useEffect(() => {
+    if (!profile) return;
+    let cancelled = false;
+    fetchBestVerifiedCatchOz(profile.id).then((oz) => {
+      if (!cancelled) setBestVerifiedOz(oz);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [profile]);
 
   const avatarUrl = profile?.avatar_path ? getPublicStorageUrl('post-media', profile.avatar_path) : null;
 
@@ -73,7 +90,7 @@ export default function ProfileScreen() {
               avatarUrl={avatarUrl}
               displayName={profile.display_name}
               username={profile.username}
-              declaredPbOz={profile.declared_pb_oz}
+              pb={personalBest(profile.declared_pb_oz, bestVerifiedOz)}
               pbVerified={profile.pb_verified}
               followerCount={profile.follower_count}
               followingCount={profile.following_count}

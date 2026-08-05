@@ -1,4 +1,5 @@
 import { getPublicStorageUrl } from '@/lib/storage';
+import { fetchBestVerifiedCatchOz, personalBest } from '@/lib/personalBest';
 import { supabase } from '@/lib/supabase';
 
 export interface DivisionOverview {
@@ -76,17 +77,9 @@ export async function fetchLeagueOverview(): Promise<LeagueOverview | null> {
     .maybeSingle();
   if (!season) return null;
 
-  const [{ data: profile }, { data: bestCatch }, { data: divisionsRaw }] = await Promise.all([
+  const [{ data: profile }, bestVerifiedOz, { data: divisionsRaw }] = await Promise.all([
     supabase.from('profiles').select('declared_pb_oz').eq('id', user.id).maybeSingle(),
-    // Same "best verified catch" comparison submit_catch uses to decide is_pb.
-    supabase
-      .from('catches')
-      .select('weight_oz')
-      .eq('angler_id', user.id)
-      .eq('status', 'verified')
-      .order('weight_oz', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    fetchBestVerifiedCatchOz(user.id),
     supabase
       .from('divisions')
       .select('id, name, rank, min_pb_oz, max_pb_oz')
@@ -94,12 +87,10 @@ export async function fetchLeagueOverview(): Promise<LeagueOverview | null> {
       .order('rank'),
   ]);
 
-  const declaredPbOz = profile?.declared_pb_oz ?? null;
-  const bestVerifiedOz = bestCatch?.weight_oz ?? null;
-  const currentPbOz =
-    declaredPbOz === null && bestVerifiedOz === null
-      ? null
-      : Math.max(declaredPbOz ?? 0, bestVerifiedOz ?? 0);
+  // One definition of "my PB", shared with the profile screens — see
+  // lib/personalBest. This used to be a second inline copy of the same
+  // Math.max, which is how the profile drifted out of step with it.
+  const currentPbOz = personalBest(profile?.declared_pb_oz ?? null, bestVerifiedOz).oz;
 
   const divisions = await Promise.all(
     (divisionsRaw ?? []).map(async (d): Promise<DivisionOverview> => {
