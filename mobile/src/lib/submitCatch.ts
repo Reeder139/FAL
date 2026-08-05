@@ -33,10 +33,35 @@ export interface SubmitCatchResult {
 export class DuplicateImageError extends Error {}
 
 /**
+ * Removes photos that were uploaded for a submission that then failed.
+ *
+ * Best effort by design: the caller is already reporting a failure, and a
+ * cleanup that threw would replace a useful message ("this photo has already
+ * been submitted") with a confusing one about storage. Anything that slips
+ * through shows up in private.orphaned_upload_objects for an admin to sweep.
+ *
+ * The delete is allowed by the "users clear own abandoned uploads" policy,
+ * which only permits objects no post_media row references — so this can
+ * never reach a photo that belongs to a committed catch.
+ */
+async function discardUploads(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  const { error } = await supabase.storage.from('post-media').remove(paths);
+  if (error) {
+    console.warn('[submitCatch] could not remove abandoned uploads:', error.message);
+  }
+}
+
+/**
  * Uploads every photo, then calls submit_catch in a single RPC so the
  * write (post + optional catch + all post_media rows) can't half-succeed.
  * The post_id is generated here, before any upload, since the storage path
  * itself — {user_id}/{post_id}/{filename} — depends on it.
+ *
+ * Because the uploads land before the RPC, every failure after that point
+ * has to put them back. Without this the bucket accumulated a folder of
+ * photos per rejected submission, referenced by nothing and visible to
+ * nobody.
  */
 export async function submitCatch(input: SubmitCatchInput): Promise<SubmitCatchResult> {
   const {
@@ -46,9 +71,20 @@ export async function submitCatch(input: SubmitCatchInput): Promise<SubmitCatchR
 
   const postId = generateUuidV4();
 
-  const uploaded = await Promise.all(
+  // allSettled, not all: when one upload fails the others may already have
+  // succeeded, and Promise.all would abandon them without a reference.
+  const results = await Promise.allSettled(
     input.photos.map((photo, index) => uploadCatchPhoto(photo.prepared, user.id, postId, index))
   );
+  const uploaded = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+
+  if (uploaded.length !== results.length) {
+    await discardUploads(uploaded.map((photo) => photo.storagePath));
+    const firstFailure = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
+    throw firstFailure.reason instanceof Error
+      ? firstFailure.reason
+      : new Error('Could not upload your photos.');
+  }
 
   const photosPayload = uploaded.map((photo, index) => ({
     storage_path: photo.storagePath,
@@ -75,6 +111,11 @@ export async function submitCatch(input: SubmitCatchInput): Promise<SubmitCatchR
   });
 
   if (error) {
+    // submit_catch is one transaction, so nothing it would have written
+    // survives — but the photos above are already in the bucket, and only
+    // this line knows where they are.
+    await discardUploads(uploaded.map((photo) => photo.storagePath));
+
     if (error.message.includes('DUPLICATE_IMAGE')) {
       throw new DuplicateImageError('This photo has already been submitted.');
     }

@@ -225,6 +225,9 @@ comment on column post_media.captured_in_app is
 
 create index on post_media (post_id, sort_order);
 create index on post_media (perceptual_hash) where perceptual_hash is not null;
+-- Looked up by path, not by id, by the storage delete policy — which runs
+-- per object on every delete attempt — and by orphaned_upload_objects.
+create index if not exists post_media_storage_path_idx on post_media (storage_path);
 
 create table likes (
   post_id     uuid not null references posts(id) on delete cascade,
@@ -896,6 +899,27 @@ create policy "users upload to own folder"
   with check (
     bucket_id = 'post-media'
     and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- Photos are uploaded before submit_catch runs, because the storage path
+-- contains the post id. When that RPC rejects a submission it rolls back, so
+-- the files end up referenced by nothing — this lets the client take them
+-- back out.
+--
+-- Scoped to objects no post_media row references, which is the whole safety
+-- argument: before submit_catch commits the file is rubbish; the instant it
+-- commits the file is evidence, and this policy stops matching it. A blanket
+-- "delete your own folder" would have let an angler destroy the photograph
+-- behind a submitted weight, which is what catches having no delete policy
+-- exists to prevent.
+create policy "users clear own abandoned uploads"
+  on storage.objects for delete
+  using (
+    bucket_id = 'post-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+    and not exists (
+      select 1 from public.post_media pm where pm.storage_path = storage.objects.name
+    )
   );
 
 
@@ -2795,6 +2819,134 @@ end; $$;
 
 revoke all on function public.delete_post(uuid, text) from public, anon;
 grant execute on function public.delete_post(uuid, text) to service_role, authenticated;
+
+-- ===========================================================================
+-- purge_post: remove an upload and everything belonging to it, permanently.
+--
+-- The deliberate counterpart to delete_post, not a replacement. delete_post
+-- hides the post and rejects the catch while keeping every row and the
+-- photograph, so a disputed prize can be settled later. purge_post is for
+-- uploads that should never have existed — a test, a double post, a photo on
+-- the wrong account, a member's deletion request — and destroys the lot.
+--
+-- It also settles what the duplicate-image check means. submit_catch refuses
+-- any perceptual hash already in post_media, and post_media survives a soft
+-- delete, so a deleted post used to block its own photograph from ever being
+-- uploaded again. The block is now a consequence of the evidence still
+-- existing: soft-delete and the photo stays blocked because it is still on
+-- file; purge and the hash goes with it, because there is nothing left for it
+-- to duplicate.
+--
+-- Storage is deliberately untouched. Deleting from storage.objects in SQL
+-- drops Postgres's record without removing the file. The paths are returned
+-- instead and the caller removes them through the Storage API; anything
+-- missed surfaces in private.orphaned_upload_objects.
+-- ===========================================================================
+
+create or replace function public.purge_post(p_post_id uuid, p_reason text)
+returns table (
+  post_id          uuid,
+  author_id        uuid,
+  storage_paths    text[],
+  photos_removed   integer,
+  comments_removed integer,
+  likes_removed    integer,
+  reviews_removed  integer,
+  flags_removed    integer,
+  catch_removed    boolean
+)
+language plpgsql security definer set search_path = public as $$
+declare
+  v_author_id  uuid;
+  v_kind       text;
+  v_deleted_at timestamptz;
+  v_catch_id   uuid;
+  v_weight_oz  integer;
+  v_status     text;
+  v_caught_at  timestamptz;
+  v_paths      text[];
+  v_photos     integer := 0;
+  v_comments   integer := 0;
+  v_likes      integer := 0;
+  v_reviews    integer := 0;
+  v_flags      integer := 0;
+begin
+  select p.author_id, p.kind, p.deleted_at
+    into v_author_id, v_kind, v_deleted_at
+    from posts p where p.id = p_post_id;
+  if v_author_id is null then
+    raise exception 'post % not found', p_post_id using errcode = 'P0002';
+  end if;
+
+  select c.id, c.weight_oz, c.status, c.caught_at
+    into v_catch_id, v_weight_oz, v_status, v_caught_at
+    from catches c where c.post_id = p_post_id;
+
+  -- Captured first: once the post_media rows go there is no record of where
+  -- the files were.
+  select coalesce(array_agg(pm.storage_path order by pm.storage_path), '{}')
+    into v_paths
+    from post_media pm where pm.post_id = p_post_id;
+
+  perform private.admin_audit('purge_post', 'posts', p_post_id,
+    jsonb_build_object(
+      'reason', p_reason,
+      'author_id', v_author_id,
+      'kind', v_kind,
+      'was_soft_deleted', v_deleted_at is not null,
+      'catch_id', v_catch_id,
+      'catch_weight_oz', v_weight_oz,
+      'catch_status', v_status,
+      'catch_caught_at', v_caught_at,
+      'storage_paths', to_jsonb(v_paths)
+    ));
+
+  delete from comments where comments.post_id = p_post_id;
+  get diagnostics v_comments = row_count;
+
+  delete from likes where likes.post_id = p_post_id;
+  get diagnostics v_likes = row_count;
+
+  if v_catch_id is not null then
+    delete from flags where flags.catch_id = v_catch_id;
+    get diagnostics v_flags = row_count;
+
+    delete from catch_reviews where catch_reviews.catch_id = v_catch_id;
+    get diagnostics v_reviews = row_count;
+
+    delete from catches where catches.id = v_catch_id;
+  end if;
+
+  delete from post_media where post_media.post_id = p_post_id;
+  get diagnostics v_photos = row_count;
+
+  delete from posts where posts.id = p_post_id;
+
+  return query select
+    p_post_id, v_author_id, v_paths,
+    v_photos, v_comments, v_likes, v_reviews, v_flags,
+    v_catch_id is not null;
+end; $$;
+
+revoke all on function public.purge_post(uuid, text) from public, anon;
+grant execute on function public.purge_post(uuid, text) to service_role;
+
+-- Files in post-media that nothing references: a submission that failed
+-- after uploading, or a purge whose Storage API step never ran.
+create or replace view private.orphaned_upload_objects
+with (security_invoker = on) as
+select
+  o.name                                as storage_path,
+  (storage.foldername(o.name))[1]::uuid as author_id,
+  o.created_at,
+  (o.metadata ->> 'size')::bigint       as size_bytes
+from storage.objects o
+where o.bucket_id = 'post-media'
+  -- Avatars sit at the top level of the folder; catch photos are one deeper.
+  and array_length(storage.foldername(o.name), 1) > 1
+  and not exists (
+    select 1 from public.post_media pm where pm.storage_path = o.name
+  );
 
 -- ===========================================================================
 -- Comments: keep posts.comment_count honest, and stop an author reassigning

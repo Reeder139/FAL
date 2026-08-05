@@ -353,6 +353,104 @@ reason, not a side effect of undoing something.
 
 ---
 
+## Purging an upload — full, permanent deletion
+
+**Add this to the console.** `delete_post` above hides a post and keeps
+everything; `purge_post` destroys it. Both are needed and they are not
+interchangeable.
+
+Use `delete_post` when the fish was wrong — a bad weight, a rejected catch, a
+disputed capture. The photograph is the evidence you would settle a dispute
+with, and it stays.
+
+Use `purge_post` when the upload should never have existed: a test post, an
+accidental double, a photo on the wrong account, or a member asking for their
+content to be removed.
+
+There is one more reason to reach for it, and it is the common one.
+`submit_catch` refuses any photo whose perceptual hash is already in
+`post_media`, and `post_media` survives a soft delete — so a deleted post
+blocks its own photograph from ever being uploaded again. That is correct
+while the evidence is on file, and wrong once you have decided the upload
+should not exist. **If a member says "it won't let me re-upload my photo",
+purging the old post is the fix.**
+
+### Step 1 — the database side
+
+```ts
+// purge_post — permanent. Deletes the post, its catch, every photo record,
+// comments, likes, flags and catch reviews, in one transaction.
+//
+// Returns the storage paths it orphaned. Step 2 removes the files; this
+// function deliberately does not, because deleting from storage.objects in
+// SQL drops Postgres's record of a file without removing the file itself.
+//
+// The audit entry records what was destroyed — weight, status, paths, counts
+// — so there is still a trail after the rows are gone.
+export default async function ({ params, user }) {
+  const { postId, reason } = params
+  if (!reason?.trim()) throw new Error('A reason is required.')
+
+  // cross join lateral, not a plain comma: it forces the actor CTE to be
+  // evaluated before the function, so the operator's email is already set
+  // when the audit row is written. With a plain join the planner is free to
+  // run them the other way round and the audit loses who did it.
+  const result = await carpLeaguesAdmin.query(
+    `with actor as (select set_config('app.admin_actor', $1, true))
+     select p.*
+     from actor
+     cross join lateral public.purge_post($2::uuid, $3::text) p`,
+    [user.email, postId, reason.trim()]
+  )
+
+  // Hand the paths straight to the storage query below.
+  return result.rows[0]   // { storage_paths, photos_removed, comments_removed, ... }
+}
+```
+
+### Step 2 — remove the files
+
+Needs a **REST API resource** in Retool (call it `carpLeaguesStorage`):
+
+- Base URL `https://heplwptnonxfxvobjnri.supabase.co/storage/v1`
+- Headers `apikey: <service_role key>` and `Authorization: Bearer <service_role key>`
+
+Then one query, run on success of step 1:
+
+```
+DELETE  /object/post-media
+Body (JSON):  { "prefixes": {{ purgePost.data.storage_paths }} }
+```
+
+Wire the button as: `purgePost` → on success → `purgePostFiles`. If step 2
+fails the rows are still gone and the files simply show up in the orphan
+sweep below, so a half-finished purge is recoverable rather than silent.
+
+### Step 3 — the orphan sweep
+
+Files in the bucket that nothing references. Two ways in: a submission that
+failed after its photos uploaded, and a purge whose step 2 never ran. The app
+now clears the first kind itself, so this should normally be empty — a
+growing number here means something is failing quietly.
+
+```sql
+-- Abandoned upload files, newest first
+select storage_path, author_id, created_at,
+       round(size_bytes / 1024.0) as size_kb
+from private.orphaned_upload_objects
+order by created_at desc;
+```
+
+Feed `storage_path` from the selected rows into the same
+`DELETE /object/post-media` call as step 2. Safe by construction: the view
+only lists objects no `post_media` row points at, so it can never contain a
+live catch's photo.
+
+> Avatars are excluded — they live at the top level of the angler's folder
+> and are not upload artefacts.
+
+---
+
 ## Reported fish
 
 Members report a catch from the feed. `flags` is readable by admins only, so
