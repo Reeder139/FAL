@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -21,6 +22,7 @@ type PostCardProps = {
 
 export function PostCard({ item, viewerId, followingIds }: PostCardProps) {
   const theme = useTheme();
+  const router = useRouter();
   const openAngler = useOpenAngler();
   const [liked, setLiked] = useState(item.liked_by_viewer);
   const [likeCount, setLikeCount] = useState(item.like_count);
@@ -120,6 +122,22 @@ export function PostCard({ item, viewerId, followingIds }: PostCardProps) {
               {item.comment_count} {item.comment_count === 1 ? 'comment' : 'comments'}
             </Text>
           </View>
+
+          {/* Bottom right, and only on someone else's catch: there is
+            * nothing to report about a photo post, and the function refuses
+            * your own fish anyway — better not to offer it than to offer it
+            * and reject it. */}
+          {item.catch_id !== null && viewerId !== null && !isSelf && (
+            <Pressable
+              onPress={() => router.push({ pathname: '/report-catch', params: { catchId: item.catch_id } })}
+              hitSlop={Spacing.two}
+              accessibilityRole="button"
+              accessibilityLabel={`Report ${item.username}'s catch`}
+              style={styles.reportButton}>
+              <Ionicons name="flag-outline" size={13} color={theme.textMuted} />
+              <Text style={[Typography.caption, { color: theme.textMuted }]}>Report this catch</Text>
+            </Pressable>
+          )}
         </View>
 
         {/* Under the photo, not behind a route. A comment is about the
@@ -197,5 +215,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.one,
+  },
+  reportButton: {
+    // Pushed to the far right of the row rather than sitting in the flow
+    // with the like and comment counts: it is not a peer of those, and it
+    // should take a moment to find.
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.half,
   },
 });

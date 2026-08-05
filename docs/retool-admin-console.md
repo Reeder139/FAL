@@ -353,6 +353,80 @@ reason, not a side effect of undoing something.
 
 ---
 
+## Reported fish
+
+Members report a catch from the feed. `flags` is readable by admins only, so
+this queue is invisible to everyone else — including the angler being
+reported, who is never told who raised it.
+
+One open report per person per catch, enforced by a partial unique index.
+Without it the loudest reporter sets the queue order: report the same fish
+five times and it climbs above a catch five different people are worried
+about, which is backwards. `report_count` below is therefore distinct
+people, which is what should drive priority.
+
+```sql
+-- The queue. Everything from the review view, plus who reported it and why.
+select
+  d.*,
+  f.report_count,
+  f.first_reported_at,
+  f.reasons
+from private.catch_review_detail d
+join (
+  select catch_id,
+         count(*)                                as report_count,
+         min(created_at)                         as first_reported_at,
+         jsonb_agg(jsonb_build_object(
+           'reason', reason, 'at', created_at
+         ) order by created_at desc)             as reasons
+    from flags
+   where resolved_at is null
+   group by catch_id
+) f on f.catch_id = d.catch_id
+order by f.report_count desc, f.first_reported_at asc;
+```
+
+Sorted by how many separate people reported it, then by oldest first — so a
+catch three people flagged outranks a fresher single report, and nothing
+sits at the bottom forever.
+
+`reasons` carries the raw text. The app prefixes each with a fixed label
+(`This isn't their fish`, `This photo has been used before`, `The weight
+looks wrong`, `Wrong venue`, `Something else`) followed by the reporter's
+note, so the queue is scannable before anyone opens a photo.
+
+**Do not show `reporter_id` in the UI.** Reports are private, and a screen
+that displays who filed one will eventually be screenshotted.
+
+```ts
+// Close every open report on a catch. Per catch, not per flag: a reviewer
+// looks at one fish and decides, and everything filed about it is settled by
+// that decision. Returns how many were closed.
+//
+// This does NOT change the catch's status. Dismissing a report and rejecting
+// a fish are different decisions — call verify_catch, reject_catch or
+// request_evidence alongside it as the review warrants.
+export default async function ({ params, user }) {
+  const { catchId, note } = params
+  if (!note?.trim()) throw new Error('A note is required.')
+
+  const result = await carpLeaguesAdmin.query(
+    `with actor as (select set_config('app.admin_actor', $1, true))
+     select public.resolve_catch_flags($2::uuid, $3::text) as closed from actor`,
+    [user.email, catchId, note.trim()]
+  )
+  return { success: true, closed: result.data[0]?.closed }
+}
+```
+
+The natural screen is the review queue with a "Reported" filter, rather than
+a second page: the reviewer needs the same photos, EXIF, hash matches and
+digit profile either way, and the report is one more signal beside them
+rather than a different kind of work.
+
+---
+
 ## Read queries
 
 ```sql

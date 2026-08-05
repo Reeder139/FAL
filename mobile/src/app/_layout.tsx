@@ -31,6 +31,10 @@ export default function RootLayout() {
           {/* Same reasoning as log-catch: a focused single-task flow you
             * finish and dismiss, not a page you browse. */}
           <Stack.Screen name="search-anglers" options={{ presentation: 'modal' }} />
+          {/* Same shape as log-catch: a deliberate act with a decision in
+            * the middle of it, opened and dismissed. Comments went inline
+            * because they belong beside the photo; this does not. */}
+          <Stack.Screen name="report-catch" options={{ presentation: 'modal' }} />
           {/* Outside (auth) on purpose — see the note in the screen. A
             * recovery link creates a session, and (auth)'s layout redirects
             * anyone holding one straight to the feed. */}
