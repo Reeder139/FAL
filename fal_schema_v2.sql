@@ -3482,6 +3482,7 @@ declare
   v_season    seasons%rowtype;
   v_paid      boolean := public.is_paying_status(p_status);
   v_open_id   uuid;
+  v_open_tier text;
   v_division  divisions%rowtype;
   v_pb        integer;
 begin
@@ -3494,7 +3495,7 @@ begin
     return;
   end if;
 
-  select se.id into v_open_id
+  select se.id, se.tier into v_open_id, v_open_tier
     from season_entries se
     where se.angler_id = p_angler_id
       and se.season_id = v_season.id
@@ -3502,9 +3503,17 @@ begin
     limit 1;
 
   if v_paid then
-    if v_open_id is not null then
+    if v_open_id is not null and v_open_tier = 'competitor' then
       return query select v_season.id, 'already a competitor';
       return;
+    end if;
+
+    -- In the league but not paying: members who joined before paid
+    -- membership existed hold an open `open`-tier row. Close that period
+    -- before opening the paid one, rather than editing its tier, which
+    -- would retroactively make months of free fishing look paid.
+    if v_open_id is not null then
+      update season_entries set left_at = now() where id = v_open_id;
     end if;
 
     select p.declared_pb_oz into v_pb from profiles p where p.id = p_angler_id;
@@ -3519,10 +3528,12 @@ begin
 
     perform private.admin_audit('membership_started', 'season_entries', p_angler_id,
       jsonb_build_object('season', v_season.name, 'division', v_division.name,
-                         'stripe_status', p_status));
+                         'stripe_status', p_status,
+                         'upgraded_from_tier', v_open_tier));
     return query select v_season.id, 'stint opened';
   else
-    if v_open_id is null then
+    -- Only a paid stint can lapse.
+    if v_open_id is null or v_open_tier <> 'competitor' then
       return query select v_season.id, 'already unpaid';
       return;
     end if;

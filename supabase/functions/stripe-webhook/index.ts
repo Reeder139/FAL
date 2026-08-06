@@ -92,7 +92,15 @@ Deno.serve(async (req) => {
       return json({ received: true, note: 'unmapped subscription' });
     }
 
-    const periodEnd = (subscription as { current_period_end?: number }).current_period_end;
+    // Stripe moved current_period_end off the subscription and onto its
+    // items in the 2025 API versions. Read both: the top-level one is absent
+    // on newer versions and the item one is absent on older, and getting
+    // neither is how this silently stored null and lost "renews on".
+    const subAny = subscription as unknown as {
+      current_period_end?: number;
+      items?: { data?: { current_period_end?: number }[] };
+    };
+    const periodEnd = subAny.current_period_end ?? subAny.items?.data?.[0]?.current_period_end;
 
     const { error: upsertError } = await admin.from('subscriptions').upsert(
       {
