@@ -358,6 +358,49 @@ create table season_entries (
   prize_eligible  boolean not null default true
 );
 
+-- Paid membership is a set of stints, not a flag: a row per period the
+-- angler was paying, and scored_catches already honours joined_at/left_at,
+-- so a fish logged between stints scores nothing with no extra logic.
+--
+-- Overlap is the hazard and it is worse than it looks — scored_catches joins
+-- season_entries on angler_id alone, so two overlapping stints in one season
+-- make every catch join twice and count twice. An exclusion constraint, not
+-- unique (season_id, angler_id): the second stint is the feature, two stints
+-- open at once is the bug.
+create extension if not exists btree_gist with schema extensions;
+
+alter table season_entries add constraint season_entries_no_overlapping_stints
+  exclude using gist (
+    season_id with =,
+    angler_id with =,
+    -- '[)' so a stint ending as the next begins is not an overlap. A null
+    -- left_at gives an unbounded range: the open stint.
+    tstzrange(joined_at, left_at, '[)') with &&
+  );
+
+-- ---------------------------------------------------------------------------
+-- Stripe, mirrored. One row per angler — a second live subscription for the
+-- same person is a billing mistake, not a state to model. Stripe stays the
+-- source of truth for money; this lets the app and the console answer "is
+-- this member paid up" without a round trip.
+-- ---------------------------------------------------------------------------
+create table subscriptions (
+  angler_id              uuid primary key references profiles(id) on delete cascade,
+  stripe_customer_id     text not null unique,
+  stripe_subscription_id text unique,
+  -- Stripe's vocabulary, verbatim and deliberately unconstrained: Stripe has
+  -- added statuses before, and a CHECK here would turn that into a failing
+  -- webhook and a member who paid but did not get in. is_paying_status() is
+  -- the single place that decides meaning.
+  status                 text not null,
+  current_period_end     timestamptz,
+  cancel_at_period_end   boolean not null default false,
+  created_at             timestamptz not null default now(),
+  updated_at             timestamptz not null default now()
+);
+
+create index on subscriptions (status);
+
 create table mini_leagues (
   id          uuid primary key default uuid_generate_v4(),
   season_id   uuid not null references seasons(id) on delete cascade,
@@ -889,6 +932,10 @@ create policy "flags readable by admins only"
 insert into storage.buckets (id, name, public)
 values ('post-media', 'post-media', true)
 on conflict (id) do nothing;
+
+create policy "anglers read own subscription"
+  on subscriptions for select
+  using (auth.uid() = angler_id);
 
 create policy "post media readable by all"
   on storage.objects for select
@@ -3398,3 +3445,92 @@ begin
   return new;
 end;
 $$;
+
+-- ===========================================================================
+-- PAID MEMBERSHIP
+--
+-- Stripe's webhook calls apply_membership() with a status string; this
+-- decides what that means for the league. The competition rules live here,
+-- next to the scoring they affect, rather than in an edge function.
+-- ===========================================================================
+
+-- past_due is deliberately "paying": it means a payment failed and Stripe is
+-- retrying, which it does for roughly two weeks. Treating it as an immediate
+-- lapse would end an angler's season over an expired card, days before their
+-- bank let the retry through.
+create or replace function public.is_paying_status(p_status text)
+returns boolean
+language sql immutable as $$
+  select p_status in ('active', 'trialing', 'past_due');
+$$;
+
+-- Opens a stint when someone starts paying, closes it when they stop, and
+-- does nothing when the state already matches — so a webhook delivered twice,
+-- which Stripe says may happen, cannot open two stints or move a left_at that
+-- was already set.
+--
+-- prize_eligible is deliberately NOT touched. Whether an angler in a prize
+-- position who fell into arrears keeps it is a management decision; encoding
+-- it here would make it silently and automatically.
+create or replace function public.apply_membership(p_angler_id uuid, p_status text)
+returns table (season_id uuid, outcome text)
+language plpgsql security definer set search_path = public as $$
+declare
+  v_season    seasons%rowtype;
+  v_paid      boolean := public.is_paying_status(p_status);
+  v_open_id   uuid;
+  v_division  divisions%rowtype;
+  v_pb        integer;
+begin
+  select * into v_season
+    from seasons where status = 'running'
+    order by starts_on desc limit 1;
+
+  if v_season.id is null then
+    return query select null::uuid, 'no running season';
+    return;
+  end if;
+
+  select se.id into v_open_id
+    from season_entries se
+    where se.angler_id = p_angler_id
+      and se.season_id = v_season.id
+      and se.left_at is null
+    limit 1;
+
+  if v_paid then
+    if v_open_id is not null then
+      return query select v_season.id, 'already a competitor';
+      return;
+    end if;
+
+    select p.declared_pb_oz into v_pb from profiles p where p.id = p_angler_id;
+    v_division := public.division_for_pb(v_season.id, v_pb);
+    if v_division.id is null then
+      raise exception 'no division covers a PB of % in season %', v_pb, v_season.name
+        using errcode = '22023';
+    end if;
+
+    insert into season_entries (season_id, angler_id, division_id, tier, joined_at)
+    values (v_season.id, p_angler_id, v_division.id, 'competitor', now());
+
+    perform private.admin_audit('membership_started', 'season_entries', p_angler_id,
+      jsonb_build_object('season', v_season.name, 'division', v_division.name,
+                         'stripe_status', p_status));
+    return query select v_season.id, 'stint opened';
+  else
+    if v_open_id is null then
+      return query select v_season.id, 'already unpaid';
+      return;
+    end if;
+
+    update season_entries set left_at = now() where id = v_open_id;
+
+    perform private.admin_audit('membership_lapsed', 'season_entries', p_angler_id,
+      jsonb_build_object('season', v_season.name, 'stripe_status', p_status));
+    return query select v_season.id, 'stint closed';
+  end if;
+end; $$;
+
+revoke all on function public.apply_membership(uuid, text) from public, anon, authenticated;
+grant execute on function public.apply_membership(uuid, text) to service_role;
