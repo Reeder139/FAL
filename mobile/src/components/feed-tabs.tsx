@@ -18,7 +18,10 @@ type FeedTabsProps = {
 };
 
 export function FeedTabs({ value, onChange, showLeagueTab }: FeedTabsProps) {
-  const tabs: FeedTab[] = showLeagueTab ? ['following', 'all', 'league'] : ['following', 'all'];
+  // Following, My League, All — narrowest first, widening out to everyone.
+  // My League drops out for anglers who have no season entry, and the order
+  // still reads sensibly without it.
+  const tabs: FeedTab[] = showLeagueTab ? ['following', 'league', 'all'] : ['following', 'all'];
 
   return (
     <View style={styles.row}>
