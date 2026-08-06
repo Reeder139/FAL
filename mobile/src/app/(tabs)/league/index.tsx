@@ -84,6 +84,13 @@ export default function NationalLeagueScreen() {
         {/* Artwork banner goes here once supplied. */}
         <View style={styles.header}>
           <Text style={[Typography.h1, { color: theme.text }]}>National League</Text>
+          {/* The counterpart to the divisional tables' gold line. Primary
+            * rather than gold on purpose: gold means paid membership
+            * throughout the app, and this is the league that doesn't need
+            * it. At caption size it holds one line on a 360px phone. */}
+          <Text style={[Typography.caption, { color: theme.primary }]}>
+            All players&rsquo; best fish count in this league
+          </Text>
           {standings && (
             <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>{standings.seasonName}</Text>
           )}
@@ -115,7 +122,7 @@ export default function NationalLeagueScreen() {
               </View>
               <View style={styles.infoStat}>
                 <Text style={[Typography.label, { color: theme.label }]}>Playing for</Text>
-                <Text style={[Typography.body, { color: theme.text }]}>Bragging rights</Text>
+                <Text style={[Typography.body, { color: theme.text }]}>Top ten win prizes</Text>
               </View>
             </View>
 
