@@ -28,6 +28,7 @@ export default function MiniLeagueScreen() {
   // Bumped by the manage sheet so the table and membership reload after a
   // rename, an add or a removal.
   const [reloadKey, setReloadKey] = useState(0);
+  const [manageOpen, setManageOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -75,15 +76,34 @@ export default function MiniLeagueScreen() {
           )}
         </View>
         {rows !== null && rows.length > 0 && (
-          <ManageMiniLeague
-            miniLeagueId={id}
-            leagueName={name ?? 'Mini League'}
-            isOwner={isOwner}
-            members={rows}
-            onChanged={() => setReloadKey((k) => k + 1)}
-          />
+          <Pressable
+            onPress={() => setManageOpen(true)}
+            hitSlop={Spacing.two}
+            accessibilityRole="button"
+            accessibilityLabel={isOwner ? 'Manage this mini league' : 'Mini league options'}>
+            <Ionicons
+              name={isOwner ? 'settings-outline' : 'ellipsis-horizontal'}
+              size={20}
+              color={theme.textSecondary}
+            />
+          </Pressable>
         )}
       </View>
+
+      {/* Outside the header, deliberately. The sheet is absolutely
+        * positioned, and inside the header row it was bounded by it — 85% of
+        * a 60px bar, which is why only its title showed. */}
+      {rows !== null && rows.length > 0 && (
+        <ManageMiniLeague
+          visible={manageOpen}
+          onClose={() => setManageOpen(false)}
+          miniLeagueId={id}
+          leagueName={name ?? 'Mini League'}
+          isOwner={isOwner}
+          members={rows}
+          onChanged={() => setReloadKey((k) => k + 1)}
+        />
+      )}
 
       {rows === null ? (
         <ActivityIndicator color={theme.primary} style={styles.loading} />

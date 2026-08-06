@@ -94,7 +94,35 @@ export default function NationalLeagueScreen() {
   return (
     <TabScreen>
       <View style={styles.content}>
-        {/* Artwork banner goes here once supplied. */}
+        {/* Straight under the strapline and above the National League
+          * heading: these are the ways out of this page, and burying them
+          * under the season's stats meant scrolling past the thing you came
+          * to read to find them.
+          *
+          * Outside the loading and empty branches too — Divisions and Mini
+          * Leagues are worth reaching whether or not a season is running. */}
+        <View style={styles.linkRow}>
+          <LeagueLink
+            href="/league/divisions"
+            icon={require('@/assets/images/nav/divisions.png')}
+            label="Divisions"
+          />
+          <LeagueLink
+            href="/league/leaders"
+            icon={require('@/assets/images/nav/leaders.png')}
+            label="Leaders"
+          />
+          {/* Only once there is one to look at. A pill leading to an empty
+            * page is a worse answer than no pill. */}
+          {inAMiniLeague && (
+            <LeagueLink
+              href="/league/mini"
+              icon={require('@/assets/images/nav/national-league.png')}
+              label="Mini Leagues"
+            />
+          )}
+        </View>
+
         <View style={styles.header}>
           <Text style={[Typography.h1, { color: theme.text }]}>National League</Text>
           {/* The counterpart to the divisional tables' gold line. Primary
@@ -137,28 +165,6 @@ export default function NationalLeagueScreen() {
                 <Text style={[Typography.label, { color: theme.label }]}>Playing for</Text>
                 <Text style={[Typography.body, { color: theme.text }]}>Top ten win prizes</Text>
               </View>
-            </View>
-
-            <View style={styles.linkRow}>
-              <LeagueLink
-                href="/league/divisions"
-                icon={require('@/assets/images/nav/divisions.png')}
-                label="Divisions"
-              />
-              <LeagueLink
-                href="/league/leaders"
-                icon={require('@/assets/images/nav/leaders.png')}
-                label="Leaders"
-              />
-              {/* Only once there is one to look at. A pill leading to an
-                * empty page is a worse answer than no pill. */}
-              {inAMiniLeague && (
-                <LeagueLink
-                  href="/league/mini"
-                  icon={require('@/assets/images/nav/national-league.png')}
-                  label="Mini Leagues"
-                />
-              )}
             </View>
 
             <LeagueTable divisionId={null} showDivisionBadge />
@@ -209,7 +215,8 @@ const styles = StyleSheet.create({
   linkRow: {
     flexDirection: 'row',
     gap: Spacing.two,
-    marginBottom: Spacing.two,
+    marginTop: Spacing.two,
+    marginBottom: Spacing.three,
   },
   link: {
     flex: 1,

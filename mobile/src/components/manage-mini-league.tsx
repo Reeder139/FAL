@@ -20,6 +20,16 @@ const AVATAR_SIZE = 32;
 const SEARCH_DEBOUNCE_MS = 250;
 
 type Props = {
+  /** Controlled by the screen, which renders this outside its header.
+   *
+   * The sheet is position:absolute, and a React Native View is
+   * position:relative by default — so rendered inside the header row it was
+   * bounded by it, and `maxHeight: '85%'` resolved against about 60px. The
+   * heading fitted and everything below it was clipped away. It has to be a
+   * sibling of the header, not a child, which means the trigger and the
+   * sheet live in different places and the open state belongs to the screen. */
+  visible: boolean;
+  onClose: () => void;
   miniLeagueId: string;
   leagueName: string;
   isOwner: boolean;
@@ -34,11 +44,10 @@ type Props = {
  * Deleting asks twice. It takes the league away from everyone in it, not just
  * the person tapping, and there is no undo — mini_league_members cascades.
  */
-export function ManageMiniLeague({ miniLeagueId, leagueName, isOwner, members, onChanged }: Props) {
+export function ManageMiniLeague({ visible, onClose, miniLeagueId, leagueName, isOwner, members, onChanged }: Props) {
   const theme = useTheme();
   const router = useRouter();
 
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState(leagueName);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<AnglerSearchResult[]>([]);
@@ -50,7 +59,7 @@ export function ManageMiniLeague({ miniLeagueId, leagueName, isOwner, members, o
   useEffect(() => setName(leagueName), [leagueName]);
 
   useEffect(() => {
-    if (!open || !isOwner) return;
+    if (!visible || !isOwner) return;
     const term = query.trim();
     if (term.length < 2) {
       setResults([]);
@@ -64,7 +73,7 @@ export function ManageMiniLeague({ miniLeagueId, leagueName, isOwner, members, o
         .finally(() => setSearching(false));
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [query, open, isOwner, members]);
+  }, [query, visible, isOwner, members]);
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -80,24 +89,18 @@ export function ManageMiniLeague({ miniLeagueId, leagueName, isOwner, members, o
   };
 
   const close = () => {
-    setOpen(false);
+    onClose();
     setQuery('');
     setResults([]);
     setConfirmingDelete(false);
     setError(null);
   };
 
+  if (!visible) return null;
+
   return (
     <>
-      <Pressable
-        onPress={() => setOpen(true)}
-        hitSlop={Spacing.two}
-        accessibilityRole="button"
-        accessibilityLabel={isOwner ? 'Manage this mini league' : 'Mini league options'}>
-        <Ionicons name={isOwner ? 'settings-outline' : 'ellipsis-horizontal'} size={20} color={theme.textSecondary} />
-      </Pressable>
-
-      {open && (
+      {(
         <View style={styles.overlay}>
           <Pressable style={styles.backdrop} onPress={close} accessibilityLabel="Close" />
           <View style={[styles.sheet, { backgroundColor: theme.surface, borderColor: theme.border }, Shadows.raised]}>
