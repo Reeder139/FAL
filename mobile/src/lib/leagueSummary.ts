@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 import { supabase } from '@/lib/supabase';
 
@@ -115,24 +115,64 @@ export async function fetchLeagueSummary(): Promise<LeagueSummary | null> {
   };
 }
 
-/** Shared by every tab screen that renders the League strip in its header,
- * so the fetch-on-mount boilerplate lives in one place. */
-export function useLeagueSummary(): LeagueSummary | null {
-  const [summary, setSummary] = useState<LeagueSummary | null>(null);
+/**
+ * One summary, shared by everything that reads it, and refetchable.
+ *
+ * It used to be fetch-on-mount with an empty dependency array, per component,
+ * which broke the moment payment existed. Stripe returns the angler with a
+ * full page load, the app fetches immediately, and the webhook — a separate
+ * request from a separate machine — lands a moment later. So the summary
+ * captured `isPaidMember: false` and never looked again: the tab layout stays
+ * mounted while you move between tabs, so a member who had just paid kept
+ * being sold to for the rest of the session.
+ *
+ * A module-level store rather than a context, because the two readers are the
+ * tab layout and the strip inside it, and threading a provider through gains
+ * nothing over this. It also collapses what were two independent fetches of
+ * the same thing into one.
+ */
+let cached: LeagueSummary | null = null;
+let inflight: Promise<void> | null = null;
+const listeners = new Set<() => void>();
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchLeagueSummary()
-      .then((data) => {
-        if (!cancelled) setSummary(data);
-      })
-      .catch(() => {
-        if (!cancelled) setSummary(null);
-      });
+function emit() {
+  for (const l of listeners) l();
+}
+
+/** Refetch and notify every reader. Call this after anything that could
+ * change membership — paying is the one that matters. */
+export function refreshLeagueSummary(): Promise<void> {
+  // Share an in-flight request rather than stacking them: several screens
+  // can ask at once and the answer is the same for all of them.
+  if (inflight) return inflight;
+  inflight = fetchLeagueSummary()
+    .then((data) => {
+      cached = data;
+    })
+    .catch(() => {
+      // Keep the last good value. Dropping to null on a flaky connection
+      // would flash the upsell at a paying member, which is the exact
+      // failure this whole change exists to stop.
+    })
+    .finally(() => {
+      inflight = null;
+      emit();
+    });
+  return inflight;
+}
+
+export function useLeagueSummary(): LeagueSummary | null {
+  const subscribe = useCallback((onChange: () => void) => {
+    listeners.add(onChange);
+    if (cached === null && !inflight) void refreshLeagueSummary();
     return () => {
-      cancelled = true;
+      listeners.delete(onChange);
     };
   }, []);
 
-  return summary;
+  return useSyncExternalStore(
+    subscribe,
+    () => cached,
+    () => cached
+  );
 }

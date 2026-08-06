@@ -19,6 +19,7 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { fetchFeedPage, type FeedItemWithPhoto, type FeedTab } from '@/lib/feed';
 import { getLastFeedTab, setLastFeedTab } from '@/lib/feedTabPreference';
+import { fetchPaidMemberIds } from '@/lib/paidMembers';
 import { fetchFollowingIds, hasAnySeasonEntry } from '@/lib/follows';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -36,10 +37,25 @@ export default function HomeScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [paidIds, setPaidIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchFollowingIds().then(setFollowingIds);
   }, []);
+
+  // Who among the visible authors is a paid member, for the gold ring.
+  // Keyed off the items so a new page resolves in one query rather than
+  // each card asking for itself.
+  useEffect(() => {
+    if (items.length === 0) return;
+    let cancelled = false;
+    fetchPaidMemberIds(items.map((i) => i.author_id)).then((ids) => {
+      if (!cancelled) setPaidIds(ids);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
 
   // Resolve the starting tab once: the persisted preference, unless it was
   // "league" and this angler turns out to have no season_entries row to
@@ -162,7 +178,12 @@ export default function HomeScreen() {
           data={items}
           keyExtractor={(item) => item.post_id}
           renderItem={({ item }) => (
-            <PostCard item={item} viewerId={session?.user.id ?? null} followingIds={followingIds} />
+            <PostCard
+              item={item}
+              viewerId={session?.user.id ?? null}
+              followingIds={followingIds}
+              isPaidMember={paidIds.has(item.author_id)}
+            />
           )}
           style={styles.list}
           contentContainerStyle={styles.listContent}

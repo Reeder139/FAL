@@ -4,11 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NativeScrollEvent, NativeSyntheticEvent, View as ViewType } from 'react-native';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { LeagueFishThumb, Radii, Spacing, Typography } from '@/constants/theme';
+import { LeagueFishThumb, paidRing, Radii, Spacing, Typography } from '@/constants/theme';
 import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchLeagueTableWithGhost, type LeagueTableRow } from '@/lib/leagueTable';
 import { formatWeightOz } from '@/lib/units';
+import { fetchPaidMemberIds } from '@/lib/paidMembers';
 import { useAuth } from '@/providers/auth-provider';
 
 const DIVISION_COLOR_KEYS = ['divisionOne', 'divisionTwo', 'divisionThree'] as const;
@@ -52,12 +53,15 @@ function scoringSummary(row: LeagueTableRow): string {
 }
 
 type RowProps = {
+  /** Gold ring on the avatar. Resolved once for the whole table rather
+   * than per row. */
+  isPaidMember: boolean;
   row: LeagueTableRow;
   showDivisionBadge: boolean;
   onJoin: () => void;
 };
 
-function TableRow({ row, showDivisionBadge, onJoin }: RowProps) {
+function TableRow({ row, showDivisionBadge, onJoin, isPaidMember }: RowProps) {
   const theme = useTheme();
   const openAngler = useOpenAngler();
   const divisionColor = theme[DIVISION_COLOR_KEYS[(row.divisionRank - 1) % 3]];
@@ -83,10 +87,23 @@ function TableRow({ row, showDivisionBadge, onJoin }: RowProps) {
       </View>
 
       <Pressable onPress={openProfile} accessibilityRole="link" accessibilityLabel={`View ${row.username}'s profile`}>
+        {/* Not derived from isGhost: that only means "unpaid" in a
+          * divisional table. The national table deliberately numbers
+          * non-paying anglers as ordinary rows, so there isGhost is false
+          * for them and the ring would have been wrong. */}
         {row.avatarUrl ? (
-          <Image source={{ uri: row.avatarUrl }} style={styles.avatar} />
+          <Image
+            source={{ uri: row.avatarUrl }}
+            style={[styles.avatar, isPaidMember && paidRing(LEAGUE_AVATAR_SIZE, theme.gold)]}
+          />
         ) : (
-          <View style={[styles.avatar, { backgroundColor: theme.surfaceElevated }]} />
+          <View
+            style={[
+              styles.avatar,
+              { backgroundColor: theme.surfaceElevated },
+              isPaidMember && paidRing(LEAGUE_AVATAR_SIZE, theme.gold),
+            ]}
+          />
         )}
       </Pressable>
 
@@ -169,6 +186,7 @@ export function LeagueTable({ divisionId, showDivisionBadge = false }: LeagueTab
   const router = useRouter();
   const { profile } = useAuth();
   const [rows, setRows] = useState<LeagueTableRow[] | null>(null);
+  const [paidIds, setPaidIds] = useState<Set<string>>(new Set());
 
   // Sticky-ghost bookkeeping. onLayout is deliberately avoided: it never
   // fires for these nodes on react-native-web (the same silent failure
@@ -184,7 +202,14 @@ export function LeagueTable({ divisionId, showDivisionBadge = false }: LeagueTab
     let cancelled = false;
     fetchLeagueTableWithGhost(divisionId)
       .then((data) => {
-        if (!cancelled) setRows(data);
+        if (!cancelled) {
+          setRows(data);
+          // One lookup for the whole table. Not derived from isGhost:
+          // that only marks unpaid rows in a divisional table.
+          void fetchPaidMemberIds(data.map((r) => r.anglerId)).then((ids) => {
+            if (!cancelled) setPaidIds(ids);
+          });
+        }
       })
       .catch(() => {
         if (!cancelled) setRows([]);
@@ -288,6 +313,7 @@ export function LeagueTable({ divisionId, showDivisionBadge = false }: LeagueTab
             row={row}
             showDivisionBadge={showDivisionBadge}
             onJoin={goToJoin}
+            isPaidMember={paidIds.has(row.anglerId)}
           />
         ))}
       </ScrollView>
@@ -296,12 +322,21 @@ export function LeagueTable({ divisionId, showDivisionBadge = false }: LeagueTab
        * however far they've scrolled from their own position. */}
       {ghost && !ghostOnScreen && (
         <View style={[styles.stickyWrapper, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
-          <TableRow row={ghost} showDivisionBadge={showDivisionBadge} onJoin={goToJoin} />
+          <TableRow
+            row={ghost}
+            showDivisionBadge={showDivisionBadge}
+            onJoin={goToJoin}
+            isPaidMember={paidIds.has(ghost.anglerId)}
+          />
         </View>
       )}
     </View>
   );
 }
+
+/** Sets every row's height, so it is a constant rather than a literal
+ * buried in the stylesheet — the gold ring scales from it too. */
+const LEAGUE_AVATAR_SIZE = 36;
 
 const styles = StyleSheet.create({
   container: {
@@ -342,8 +377,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatar: {
-    width: 36,
-    height: 36,
+    width: LEAGUE_AVATAR_SIZE,
+    height: LEAGUE_AVATAR_SIZE,
     borderRadius: Radii.circle,
   },
   fishStrip: {

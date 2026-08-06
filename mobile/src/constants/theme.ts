@@ -553,6 +553,44 @@ export const LeagueFishThumb = { size: 18, overlap: 6 } as const;
  * meet whatever the photo is.
  */
 export const PostWatermark = { size: 40, opacity: 0.85, inset: Spacing.two } as const;
+
+/**
+ * The gold ring that marks a paid member, wherever their avatar appears.
+ *
+ * Drawn as a border on the avatar itself rather than as a wrapper around it.
+ * A wrapper would add its own width to every layout that contains an avatar
+ * — league table rows and the suggested rail are both tight enough that a
+ * few pixels there push text onto a second line — whereas a border insets
+ * the picture and leaves the footprint identical. The photo loses a couple
+ * of pixels at the edge; nothing moves.
+ *
+ * Scaled in three steps rather than as a ratio. A ratio gives fractional
+ * widths, which render as a blurred half-pixel line and read as a mistake
+ * rather than as a ring, and the sizes in this app cluster into these three
+ * groups anyway: the 18px league thumbnails and small rows, ordinary 40-60px
+ * avatars, and the 104px leader portrait.
+ */
+export const PaidMemberRing = {
+  small: 2,
+  medium: 3,
+  large: 4,
+  /** Below this an avatar gets `small`; below `largeAbove` it gets `medium`. */
+  mediumAbove: 32,
+  largeAbove: 88,
+} as const;
+
+/** Border style marking `size`px avatar as belonging to a paid member.
+ * Spread into an existing avatar style — it deliberately sets nothing but
+ * the border, so it cannot disturb the layout it lands in. */
+export function paidRing(size: number, gold: string) {
+  const width =
+    size >= PaidMemberRing.largeAbove
+      ? PaidMemberRing.large
+      : size >= PaidMemberRing.mediumAbove
+        ? PaidMemberRing.medium
+        : PaidMemberRing.small;
+  return { borderWidth: width, borderColor: gold };
+}
 /** Caps on the welcome screen's artwork, which is otherwise width-driven.
  *
  * Both exist for the same reason: that screen must fit without scrolling,

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FollowButton } from '@/components/follow-button';
-import { Radii, Spacing, Typography } from '@/constants/theme';
+import { paidRing, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { PersonalBest } from '@/lib/personalBest';
 import { formatWeightOz } from '@/lib/units';
@@ -30,6 +30,9 @@ type ProfileHeaderProps = {
   onChangeAvatar?: () => void;
   /** Shows the avatar mid-upload so a slow pick doesn't look like a no-op. */
   changingAvatar?: boolean;
+  /** Gold ring on the avatar. Resolved by the screen, which already
+   * fetches this angler, rather than by a second lookup here. */
+  isPaidMember?: boolean;
 };
 
 /** Shared by the self profile screen and the view-another-angler screen.
@@ -52,6 +55,7 @@ export function ProfileHeader({
   isFollowing,
   onChangeAvatar,
   changingAvatar = false,
+  isPaidMember = false,
 }: ProfileHeaderProps) {
   const theme = useTheme();
   const router = useRouter();
@@ -74,9 +78,18 @@ export function ProfileHeader({
           accessibilityLabel={avatarUrl ? 'Change your profile picture' : 'Add a profile picture'}
           style={({ pressed }) => [styles.avatarButton, pressed && styles.avatarPressed]}>
           {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+            <Image
+              source={{ uri: avatarUrl }}
+              style={[styles.avatar, isPaidMember && paidRing(PROFILE_AVATAR_SIZE, theme.gold)]}
+            />
           ) : (
-            <View style={[styles.avatar, { backgroundColor: theme.surfaceElevated }]} />
+            <View
+              style={[
+                styles.avatar,
+                { backgroundColor: theme.surfaceElevated },
+                isPaidMember && paidRing(PROFILE_AVATAR_SIZE, theme.gold),
+              ]}
+            />
           )}
           {/* A camera badge on the rim rather than a caption underneath: it
            * says the picture is editable without adding a row of chrome to a
@@ -145,6 +158,8 @@ export function ProfileHeader({
   );
 }
 
+const PROFILE_AVATAR_SIZE = Spacing.six;
+
 const styles = StyleSheet.create({
   container: {
     width: '100%',
@@ -152,8 +167,8 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   avatar: {
-    width: Spacing.six,
-    height: Spacing.six,
+    width: PROFILE_AVATAR_SIZE,
+    height: PROFILE_AVATAR_SIZE,
     borderRadius: Radii.circle,
     marginBottom: Spacing.three,
   },

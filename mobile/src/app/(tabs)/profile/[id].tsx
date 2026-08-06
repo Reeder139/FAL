@@ -6,6 +6,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { ProfileHeader } from '@/components/profile-header';
 import { TabScreen } from '@/components/tab-screen';
 import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
+import { fetchPaidMemberIds } from '@/lib/paidMembers';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchAnglerProfile, type AnglerProfile } from '@/lib/follows';
 
@@ -14,7 +15,22 @@ export default function AnglerProfileScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [angler, setAngler] = useState<AnglerProfile | null>(null);
+  const [isPaidMember, setIsPaidMember] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Gold ring on the avatar. Its own lookup because this screen fetches
+  // one angler, so there is no page of ids to batch it with.
+  useEffect(() => {
+    const anglerId = id;
+    if (!anglerId) return;
+    let cancelled = false;
+    fetchPaidMemberIds([anglerId]).then((ids) => {
+      if (!cancelled) setIsPaidMember(ids.has(anglerId));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -57,6 +73,7 @@ export default function AnglerProfileScreen() {
           </View>
         ) : (
           <ProfileHeader
+              isPaidMember={isPaidMember}
             anglerId={angler.id}
             avatarUrl={angler.avatarUrl}
             displayName={angler.displayName}

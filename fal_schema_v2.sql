@@ -1533,6 +1533,9 @@ begin
           where se.angler_id = l.angler_id
             and se.season_id = l.season_id
             and se.tier = 'competitor'
+            -- Paid membership is a set of stints; a closed one records a
+            -- period they *were* a competitor, not that they still are.
+            and se.left_at is null
         ) as is_paid
       from league_table l
       where l.season_id = v_season.id

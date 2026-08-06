@@ -8,6 +8,7 @@ import { ProfileHeader } from '@/components/profile-header';
 import { TabScreen } from '@/components/tab-screen';
 import { UnderReviewBanner } from '@/components/under-review-banner';
 import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
+import { fetchPaidMemberIds } from '@/lib/paidMembers';
 import { useTheme } from '@/hooks/use-theme';
 import { pickAndUploadAvatar } from '@/lib/avatarUpload';
 import { fetchBestVerifiedCatchOz, personalBest } from '@/lib/personalBest';
@@ -20,8 +21,24 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { profile, signOut, refreshProfile } = useAuth();
   const [changingAvatar, setChangingAvatar] = useState(false);
+  const [isPaidMember, setIsPaidMember] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [bestVerifiedOz, setBestVerifiedOz] = useState<number | null>(null);
+
+  // Gold ring on the avatar. Its own lookup because this screen fetches one
+  // angler, so there is no page of ids to batch it with. Re-runs when the
+  // profile refreshes, which is what returning from checkout triggers.
+  useEffect(() => {
+    const anglerId = profile?.id;
+    if (!anglerId) return;
+    let cancelled = false;
+    fetchPaidMemberIds([anglerId]).then((ids) => {
+      if (!cancelled) setIsPaidMember(ids.has(anglerId));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.id]);
 
   // Fetched here rather than carried on the auth profile: the auth row is
   // cached for the session, and a PB that only refreshed on sign-in is the
@@ -89,6 +106,7 @@ export default function ProfileScreen() {
         {profile && (
           <>
             <ProfileHeader
+              isPaidMember={isPaidMember}
               anglerId={profile.id}
               avatarUrl={avatarUrl}
               displayName={profile.display_name}

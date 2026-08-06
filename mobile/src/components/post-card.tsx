@@ -5,12 +5,16 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FollowButton } from '@/components/follow-button';
 import { PostComments } from '@/components/post-comments';
-import { PostWatermark, Radii, Shadows, Spacing, Typography } from '@/constants/theme';
+import { paidRing, PostWatermark, Radii, Shadows, Spacing, Typography } from '@/constants/theme';
 import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
 import type { FeedItemWithPhoto } from '@/lib/feed';
 import { setPostLike } from '@/lib/likes';
 import { formatWeightOz } from '@/lib/units';
+
+/** The avatar's drawn size, so the gold ring can scale to it. Matches
+ * styles.avatar below — the two must stay in step. */
+const AVATAR_SIZE = Spacing.five;
 
 type PostCardProps = {
   item: FeedItemWithPhoto;
@@ -18,9 +22,12 @@ type PostCardProps = {
    * rather than guessing in that window. */
   viewerId: string | null;
   followingIds: Set<string>;
+  /** Paid members get a gold ring on their avatar. Passed in rather than
+   * looked up here — the feed resolves a whole page in one query. */
+  isPaidMember?: boolean;
 };
 
-export function PostCard({ item, viewerId, followingIds }: PostCardProps) {
+export function PostCard({ item, viewerId, followingIds, isPaidMember }: PostCardProps) {
   const theme = useTheme();
   const router = useRouter();
   const openAngler = useOpenAngler();
@@ -65,9 +72,18 @@ export function PostCard({ item, viewerId, followingIds }: PostCardProps) {
       <View style={styles.header}>
         <Pressable onPress={goToProfile} style={styles.headerIdentity} hitSlop={Spacing.one}>
           {item.avatar_path ? (
-            <Image source={{ uri: item.avatar_path }} style={styles.avatar} />
+            <Image
+              source={{ uri: item.avatar_path }}
+              style={[styles.avatar, isPaidMember && paidRing(AVATAR_SIZE, theme.gold)]}
+            />
           ) : (
-            <View style={[styles.avatar, { backgroundColor: theme.surfaceElevated }]} />
+            <View
+              style={[
+                styles.avatar,
+                { backgroundColor: theme.surfaceElevated },
+                isPaidMember && paidRing(AVATAR_SIZE, theme.gold),
+              ]}
+            />
           )}
           <Text style={[Typography.h3, { color: theme.text }]}>{item.username}</Text>
         </Pressable>

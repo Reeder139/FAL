@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/app-button';
 import { DivisionWash, MaxContentWidth, Radii, Spacing, Typography, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { refreshLeagueSummary } from '@/lib/leagueSummary';
 import { AlreadyMemberError, hasActiveMembership, startMembershipCheckout } from '@/lib/membership';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -83,6 +84,11 @@ export default function JoinScreen() {
       if (await hasActiveMembership()) {
         stopPolling();
         setStatus({ kind: 'member' });
+        // The tab layout and the League strip both read a cached summary
+        // that was fetched before the webhook landed. Without this they go
+        // on showing the upsell card and the "join for £20,000" banner to
+        // somebody who has just paid.
+        void refreshLeagueSummary();
       }
     };
     void check();
