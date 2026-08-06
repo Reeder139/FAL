@@ -101,7 +101,7 @@ export async function fetchLeagueOverview(): Promise<LeagueOverview | null> {
           .eq('season_id', season.id)
           .eq('division_id', d.id),
         supabase
-          .from('league_table')
+          .from('division_league_table')
           .select('total_points')
           .eq('season_id', season.id)
           .eq('division_id', d.id)
@@ -206,7 +206,7 @@ export async function fetchDivisionLeaders(): Promise<DivisionLeadersOverview | 
           .eq('season_id', season.id)
           .eq('division_id', d.id),
         supabase
-          .from('league_table')
+          .from('division_league_table')
           .select('angler_id, total_points, counting_fish')
           .eq('season_id', season.id)
           .eq('division_id', d.id)
@@ -362,7 +362,7 @@ export async function fetchDivisionStandings(divisionId: string): Promise<Divisi
 
   const [{ data: tableRows }, { count: memberCount }] = await Promise.all([
     supabase
-      .from('league_table')
+      .from('division_league_table')
       .select('angler_id, total_points, counting_fish, best_fish_oz, position')
       .eq('season_id', division.season_id)
       .eq('division_id', divisionId)

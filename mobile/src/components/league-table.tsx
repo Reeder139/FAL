@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NativeScrollEvent, NativeSyntheticEvent, View as ViewType } from 'react-native';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { LeagueFishThumb, paidRing, Radii, Spacing, Typography } from '@/constants/theme';
+import { FontWeight, LeagueFishThumb, paidRing, Radii, Spacing, Typography } from '@/constants/theme';
 import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchLeagueTableWithGhost, type LeagueTableRow } from '@/lib/leagueTable';
@@ -301,6 +301,18 @@ export function LeagueTable({ divisionId, showDivisionBadge = false }: LeagueTab
 
   return (
     <View style={styles.container} ref={containerRef}>
+      {/* Divisional totals differ from national ones for anyone who joined
+        * part-way through, and without saying why that reads as a bug. It
+        * is above the table rather than in a footnote because the number it
+        * explains is the first thing read. */}
+      {divisionId !== null && (
+        <View style={[styles.scopeNotice, { backgroundColor: theme.surface, borderColor: theme.gold }]}>
+          <Ionicons name="information-circle-outline" size={16} color={theme.gold} />
+          <Text style={[Typography.bodySmall, styles.scopeNoticeText, { color: theme.text }]}>
+            Only fish caught after your join date count in this paid member league
+          </Text>
+        </View>
+      )}
       <ScrollView
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
@@ -339,6 +351,20 @@ export function LeagueTable({ divisionId, showDivisionBadge = false }: LeagueTab
 const LEAGUE_AVATAR_SIZE = 36;
 
 const styles = StyleSheet.create({
+  scopeNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderWidth: 1,
+    borderRadius: Radii.sm,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    marginBottom: Spacing.two,
+  },
+  scopeNoticeText: {
+    flex: 1,
+    fontWeight: FontWeight.bold,
+  },
   container: {
     flex: 1,
   },

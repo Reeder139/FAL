@@ -22,9 +22,11 @@ export type LeagueSummary = PaidFlag &
  *    message. This must NOT fall back to "no_catches" — that's actively
  *    wrong when the angler has genuinely logged something; it just isn't
  *    scoreable against anything right now.
- * 3. Has a season_entries row for the current season -> read straight from
- *    league_table (position/points come from real standings).
- * 4. No season_entries row -> hypothetical_league_position, the same
+ * 3. Is a paid member of the current season -> read straight from
+ *    division_league_table. The strip states a *divisional* standing, so it
+ *    has to be scored the way the division is: fish caught before they paid
+ *    do not count towards it, even though they still count nationally.
+ * 4. No paid entry -> hypothetical_league_position, the same
  *    "mirror the real scoring without requiring a row" approach the catch
  *    result card uses for hypothetical_catch_preview.
  *
@@ -68,10 +70,14 @@ export async function fetchLeagueSummary(): Promise<LeagueSummary | null> {
   if (!catchCount) return { kind: 'no_catches', isPaidMember };
   if (!season) return { kind: 'no_active_season', isPaidMember };
 
-  if (entry) {
+  // Paid members only. division_league_table contains `competitor` stints and
+  // nothing else, so a free member holding an open-tier entry has no row in
+  // it and would read as zero points — they belong on the hypothetical path
+  // below, which is what it exists for.
+  if (entry && isPaidMember) {
     const [{ data: table }, { data: division }, { count: memberCount }] = await Promise.all([
       supabase
-        .from('league_table')
+        .from('division_league_table')
         .select('total_points, position')
         .eq('season_id', season.id)
         .eq('division_id', entry.division_id)

@@ -80,7 +80,7 @@ export async function fetchLeagueTableWithGhost(divisionId: string | null): Prom
     countingFishPhotos: [],
   }));
 
-  await attachCountingFishPhotos(rows);
+  await attachCountingFishPhotos(rows, divisionId !== null);
 
   // Sorted on points, not position: unnumbered rows have no position to sort
   // by, and points is what the order actually means in both modes. The
@@ -130,7 +130,17 @@ async function selectIn<T>(
  * not the post the photo hangs off, and there's no direct join from a catch
  * to its media (both reference the post, not each other).
  */
-async function attachCountingFishPhotos(rows: LeagueTableRow[]): Promise<void> {
+/**
+ * @param divisionScope true for a divisional table, where only fish caught
+ *   inside a paid stint count. The two tables legitimately show different
+ *   fish for the same angler, so the thumbnails have to come from whichever
+ *   ranking the row's points were taken from — otherwise the strip shows
+ *   fish that did not earn the position beside it.
+ */
+async function attachCountingFishPhotos(
+  rows: LeagueTableRow[],
+  divisionScope: boolean
+): Promise<void> {
   for (const row of rows) row.countingFishPhotos = [];
   if (rows.length === 0) return;
 
@@ -146,7 +156,7 @@ async function attachCountingFishPhotos(rows: LeagueTableRow[]): Promise<void> {
 
   const anglerIds = [...new Set(rows.map((r) => r.anglerId))];
   const scored = await selectIn<{ catch_id: string; angler_id: string; rank_in_season: number }>(
-    'scored_catches',
+    divisionScope ? 'division_scored_catches' : 'scored_catches',
     'catch_id, angler_id, rank_in_season',
     'angler_id',
     anglerIds,

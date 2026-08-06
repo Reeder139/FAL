@@ -1520,26 +1520,44 @@ begin
   -- out. Ties share a number, which is what rank() did before.
   if p_division_id is not null then
     return query
-    with member_rows as (
+    with base as (
       select
         l.angler_id,
         l.division_id,
-        l.total_points,
-        l.counting_fish,
-        l.best_fish_oz,
+        l.total_points  as national_points,
+        l.counting_fish as national_fish,
+        l.best_fish_oz  as national_best,
         exists (
           select 1
           from season_entries se
           where se.angler_id = l.angler_id
             and se.season_id = l.season_id
             and se.tier = 'competitor'
-            -- Paid membership is a set of stints; a closed one records a
-            -- period they *were* a competitor, not that they still are.
             and se.left_at is null
         ) as is_paid
       from league_table l
       where l.season_id = v_season.id
         and l.division_id = p_division_id
+    ),
+    -- A paid angler is scored on their paid fish only; an unpaid one is
+    -- still shown at their national standing, because that is a real thing
+    -- about them and showing 0 would say something false.
+    member_rows as (
+      select
+        b.angler_id,
+        b.division_id,
+        b.is_paid,
+        case when b.is_paid then coalesce(dl.total_points, 0) else b.national_points end
+          as total_points,
+        case when b.is_paid then coalesce(dl.counting_fish, 0) else b.national_fish end
+          as counting_fish,
+        case when b.is_paid then dl.best_fish_oz else b.national_best end
+          as best_fish_oz
+      from base b
+      left join division_league_table dl
+        on dl.angler_id = b.angler_id
+       and dl.season_id = v_season.id
+       and dl.division_id = b.division_id
     )
     select
       m.angler_id,
@@ -3548,3 +3566,68 @@ end; $$;
 
 revoke all on function public.apply_membership(uuid, text) from public, anon, authenticated;
 grant execute on function public.apply_membership(uuid, text) to service_role;
+
+
+-- ===========================================================================
+-- DIVISIONAL SCORING — paid fish only
+--
+-- The divisional tables are the cash-prize competition, so a fish caught
+-- before the angler started paying cannot count towards one. The national
+-- table is deliberately unaffected: it is bragging rights with no prize
+-- attached, and every qualifying fish they caught this season belongs in it.
+--
+-- The two therefore answer different questions and will legitimately show
+-- different totals and different counting fish for the same angler, which is
+-- why the divisional pages carry a line saying so.
+--
+-- Ranked within itself: the cap of 5 (or 3 in winter) has to apply to the
+-- paid fish, not be inherited from a national ranking a pre-join fish
+-- already occupies.
+-- ===========================================================================
+
+create or replace view division_scored_catches
+with (security_invoker = on) as
+select
+  c.id            as catch_id,
+  c.angler_id,
+  se.season_id,
+  se.division_id,
+  c.weight_oz,
+  c.caught_at,
+  fal_points(c.weight_oz, s.scoring_multiplier, s.scoring_offset_oz,
+             s.scoring_exponent, s.min_qualifying_oz)
+    * case when c.is_pb then s.pb_bonus_multiplier else 1 end
+    * case when c.fish_name is not null then s.named_fish_multiplier else 1 end
+                  as points,
+  row_number() over (
+    partition by c.angler_id, se.season_id
+    order by fal_points(c.weight_oz, s.scoring_multiplier, s.scoring_offset_oz,
+                        s.scoring_exponent, s.min_qualifying_oz) desc,
+             c.caught_at asc
+  )               as rank_in_season
+from catches c
+join season_entries se on se.angler_id = c.angler_id
+                      and se.tier = 'competitor'
+join seasons s         on s.id = se.season_id
+where c.status = 'verified'
+  and c.caught_at::date between s.starts_on and s.ends_on
+  and c.caught_at >= se.joined_at
+  and (se.left_at is null or c.caught_at < se.left_at);
+
+create or replace view division_league_table
+with (security_invoker = on) as
+select
+  sc.season_id,
+  sc.division_id,
+  sc.angler_id,
+  sum(sc.points)    as total_points,
+  count(*)          as counting_fish,
+  max(sc.weight_oz) as best_fish_oz,
+  rank() over (
+    partition by sc.season_id, sc.division_id
+    order by sum(sc.points) desc
+  )                 as position
+from division_scored_catches sc
+join seasons s on s.id = sc.season_id
+where sc.rank_in_season <= s.counting_fish
+group by sc.season_id, sc.division_id, sc.angler_id;
