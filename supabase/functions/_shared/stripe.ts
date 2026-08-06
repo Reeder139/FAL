@@ -16,8 +16,23 @@
 import Stripe from 'npm:stripe@17.7.0';
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 
+/**
+ * An environment value with surrounding whitespace removed.
+ *
+ * Every one of these is copied by hand out of a dashboard and pasted into
+ * another, and a stray tab or newline rides along more often than not. None
+ * of these values can legitimately contain leading or trailing whitespace,
+ * and the failures it causes are the confusing kind: a trailing tab on the
+ * price id produced "No such price: 'price_...\t'", and the same thing on the
+ * webhook secret would reject every genuine Stripe delivery as an invalid
+ * signature. Cheaper to strip it than to diagnose it twice.
+ */
+export function env(name: string): string | undefined {
+  return Deno.env.get(name)?.trim() || undefined;
+}
+
 export function stripeClient(): Stripe {
-  const key = Deno.env.get('STRIPE_SECRET_KEY');
+  const key = env('STRIPE_SECRET_KEY');
   if (!key) throw new Error('STRIPE_SECRET_KEY is not set');
   return new Stripe(key, {
     apiVersion: '2025-01-27.acacia',
@@ -28,15 +43,15 @@ export function stripeClient(): Stripe {
 }
 
 export function adminClient(): SupabaseClient {
-  const url = Deno.env.get('SUPABASE_URL')!;
-  const key = Deno.env.get('SECRET_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const url = env('SUPABASE_URL')!;
+  const key = env('SECRET_KEY') ?? env('SUPABASE_SERVICE_ROLE_KEY');
   if (!key) throw new Error('SECRET_KEY is not set');
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
 /** Where Checkout sends the angler back to. */
 export function siteUrl(): string {
-  return Deno.env.get('SITE_URL') ?? 'https://www.carpleagues.com';
+  return env('SITE_URL') ?? 'https://www.carpleagues.com';
 }
 
 export const CORS = {

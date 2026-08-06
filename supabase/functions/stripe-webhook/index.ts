@@ -7,7 +7,7 @@
 // the caller instead, and it is not optional — without it this endpoint is
 // "anyone on the internet can grant themselves a paid membership".
 
-import { adminClient, json, stripeClient } from '../_shared/stripe.ts';
+import { adminClient, env, json, stripeClient } from '../_shared/stripe.ts';
 // A value import, not `import type` — createSubtleCryptoProvider() below is
 // called at runtime, and the Stripe.* types come off the same default export.
 import Stripe from 'npm:stripe@17.7.0';
@@ -24,7 +24,7 @@ const HANDLED = new Set([
 
 Deno.serve(async (req) => {
   const signature = req.headers.get('stripe-signature');
-  const secret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
+  const secret = env('STRIPE_WEBHOOK_SECRET');
   if (!signature || !secret) return json({ error: 'Missing signature or secret' }, 400);
 
   const stripe = stripeClient();

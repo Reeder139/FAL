@@ -10,7 +10,7 @@
 // closes the tab on the payment page, or who reaches the success URL by
 // typing it, gets nothing.
 
-import { adminClient, CORS, json, siteUrl, stripeClient } from '../_shared/stripe.ts';
+import { adminClient, CORS, env, json, siteUrl, stripeClient } from '../_shared/stripe.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 Deno.serve(async (req) => {
@@ -23,14 +23,14 @@ Deno.serve(async (req) => {
     // or more to the point start a checkout as, somebody else.
     const authHeader = req.headers.get('Authorization') ?? '';
     const caller = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY')!,
+      env('SUPABASE_URL')!,
+      env('SUPABASE_PUBLISHABLE_KEY') ?? env('SUPABASE_ANON_KEY')!,
       { global: { headers: { Authorization: authHeader } }, auth: { persistSession: false } }
     );
     const { data: { user }, error: authError } = await caller.auth.getUser();
     if (authError || !user) return json({ error: 'Must be signed in.' }, 401);
 
-    const priceId = Deno.env.get('STRIPE_PRICE_ID');
+    const priceId = env('STRIPE_PRICE_ID');
     if (!priceId) return json({ error: 'STRIPE_PRICE_ID is not set' }, 500);
 
     const stripe = stripeClient();
@@ -77,10 +77,12 @@ Deno.serve(async (req) => {
       line_items: [{ price: priceId, quantity: 1 }],
       client_reference_id: user.id,
       subscription_data: { metadata: { angler_id: user.id } },
-      // Back into the app either way. The success page must not assume
-      // payment succeeded — the webhook is the only thing that grants
-      // membership, and it may land a moment later.
-      success_url: `${site}/league?checkout=success`,
+      // Both return to /join, not to the league. The webhook is a separate
+      // request from a separate machine and occasionally lands a second or
+      // two after the redirect — dropping someone straight onto the league
+      // table would show them the ghost position they just paid to escape.
+      // /join waits for the subscription to appear and then says so.
+      success_url: `${site}/join?checkout=success`,
       cancel_url: `${site}/join?checkout=cancelled`,
       allow_promotion_codes: true,
     });
