@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { ManageMiniLeague } from '@/components/manage-mini-league';
 import { TabScreen } from '@/components/tab-screen';
 import { MaxContentWidth, paidRing, Radii, Spacing, Typography } from '@/constants/theme';
 import { useOpenAngler } from '@/hooks/use-open-angler';
@@ -23,6 +24,10 @@ export default function MiniLeagueScreen() {
   const [name, setName] = useState<string | null>(null);
   const [seasonName, setSeasonName] = useState<string | null>(null);
   const [paidIds, setPaidIds] = useState<Set<string>>(new Set());
+  const [isOwner, setIsOwner] = useState(false);
+  // Bumped by the manage sheet so the table and membership reload after a
+  // rename, an add or a removal.
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!id) return;
@@ -36,6 +41,7 @@ export default function MiniLeagueScreen() {
         setRows(table);
         const league = leagues.find((l) => l.id === id);
         setName(league?.name ?? null);
+        setIsOwner(league?.isOwner ?? false);
         setSeasonName(league?.seasonName ?? null);
         void fetchPaidMemberIds(table.map((r) => r.anglerId)).then((ids) => {
           if (!cancelled) setPaidIds(ids);
@@ -47,7 +53,7 @@ export default function MiniLeagueScreen() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
   return (
     <TabScreen>
@@ -68,6 +74,15 @@ export default function MiniLeagueScreen() {
             <Text style={[Typography.bodySmall, { color: theme.primary }]}>{seasonName}</Text>
           )}
         </View>
+        {rows !== null && rows.length > 0 && (
+          <ManageMiniLeague
+            miniLeagueId={id}
+            leagueName={name ?? 'Mini League'}
+            isOwner={isOwner}
+            members={rows}
+            onChanged={() => setReloadKey((k) => k + 1)}
+          />
+        )}
       </View>
 
       {rows === null ? (

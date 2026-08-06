@@ -74,3 +74,53 @@ export async function createMiniLeague(name: string, memberIds: string[]): Promi
   }
   return data as string;
 }
+
+/** Owner-only. Returns how many were actually added — anyone already in is
+ * skipped rather than being an error. */
+export async function addMiniLeagueMembers(miniLeagueId: string, memberIds: string[]): Promise<number> {
+  const { data, error } = await supabase.rpc('add_mini_league_members', {
+    p_mini_league_id: miniLeagueId,
+    p_member_ids: memberIds,
+  });
+  if (error) throw error;
+  return (data as number) ?? 0;
+}
+
+/** The owner may remove anyone; anyone may remove themselves. The owner
+ * cannot remove themselves — they delete the league instead, which is what
+ * the error says. */
+export async function removeMiniLeagueMember(miniLeagueId: string, anglerId: string): Promise<void> {
+  const { error } = await supabase.rpc('remove_mini_league_member', {
+    p_mini_league_id: miniLeagueId,
+    p_angler_id: anglerId,
+  });
+  if (error) {
+    throw new Error(
+      error.message.includes('OWNER_CANNOT_LEAVE')
+        ? 'You own this league — delete it instead of leaving.'
+        : error.message
+    );
+  }
+}
+
+export async function renameMiniLeague(miniLeagueId: string, name: string): Promise<void> {
+  const { error } = await supabase.from('mini_leagues').update({ name: name.trim() }).eq('id', miniLeagueId);
+  if (error) throw error;
+}
+
+/** Owner-only, enforced by RLS rather than by a function — there is nothing
+ * to do beyond the delete, and the membership cascades. */
+export async function deleteMiniLeague(miniLeagueId: string): Promise<void> {
+  const { error } = await supabase.from('mini_leagues').delete().eq('id', miniLeagueId);
+  if (error) throw error;
+}
+
+export async function joinMiniLeagueByCode(code: string): Promise<string> {
+  const { data, error } = await supabase.rpc('join_mini_league', { p_code: code });
+  if (error) {
+    throw new Error(
+      error.message.includes('NO_SUCH_LEAGUE') ? "No mini league has that code." : error.message
+    );
+  }
+  return data as string;
+}

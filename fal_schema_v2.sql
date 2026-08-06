@@ -901,16 +901,20 @@ create policy "anglers join seasons as themselves"
 create policy "mini leagues readable by all"
   on mini_leagues for select using (true);
 -- Creation goes through create_mini_league(), which gates it on paid
--- membership; there is deliberately no direct insert policy.
--- (was) create policy "users create own mini leagues"
-  on mini_leagues for insert with check (auth.uid() = owner_id);
+-- membership. There is deliberately no direct insert policy on mini_leagues.
 create policy "owners edit own mini leagues"
-  on mini_leagues for update using (auth.uid() = owner_id);
+  on mini_leagues for update
+  using (auth.uid() = owner_id)
+  -- WITH CHECK too, or an owner could hand the league to someone else in
+  -- the same statement that renamed it.
+  with check (auth.uid() = owner_id);
+
+create policy "owners delete own mini leagues"
+  on mini_leagues for delete using (auth.uid() = owner_id);
 create policy "membership readable by all"
   on mini_league_members for select using (true);
--- Members are added by the owner at creation, via create_mini_league().
--- (was) create policy "users join mini leagues as themselves"
-  on mini_league_members for insert with check (auth.uid() = angler_id);
+-- Members are added by the owner (create_mini_league, add_mini_league_members)
+-- or join with a code (join_mini_league). No direct insert policy.
 create policy "users leave mini leagues"
   on mini_league_members for delete using (auth.uid() = angler_id);
 
@@ -4022,3 +4026,104 @@ language sql stable as $$
   where mm.mini_league_id = (select id from league)
   order by coalesce(t.total_points, 0) desc, p.username;
 $$;
+
+create or replace function public.add_mini_league_members(
+  p_mini_league_id uuid,
+  p_member_ids     uuid[]
+)
+returns integer
+language plpgsql security definer set search_path = public as $$
+declare
+  v_added integer;
+begin
+  if not exists (
+    select 1 from mini_leagues m
+    where m.id = p_mini_league_id and m.owner_id = auth.uid()
+  ) then
+    raise exception 'only the owner can add members' using errcode = '42501';
+  end if;
+
+  insert into mini_league_members (mini_league_id, angler_id)
+  select p_mini_league_id, x.angler_id
+  from unnest(p_member_ids) as x(angler_id)
+  join profiles p on p.id = x.angler_id
+  on conflict do nothing;
+
+  get diagnostics v_added = row_count;
+  return v_added;
+end; $$;
+
+revoke all on function public.add_mini_league_members(uuid, uuid[]) from public, anon;
+grant execute on function public.add_mini_league_members(uuid, uuid[]) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- Removing someone. The owner may remove anyone; anyone may remove
+-- themselves. The owner cannot remove themselves while they still own it —
+-- that would leave a league nobody can administer. They delete it instead.
+-- ---------------------------------------------------------------------------
+create or replace function public.remove_mini_league_member(
+  p_mini_league_id uuid,
+  p_angler_id      uuid
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_owner uuid;
+begin
+  select m.owner_id into v_owner from mini_leagues m where m.id = p_mini_league_id;
+  if v_owner is null then
+    raise exception 'mini league not found' using errcode = 'P0002';
+  end if;
+
+  if auth.uid() <> v_owner and auth.uid() <> p_angler_id then
+    raise exception 'only the owner can remove other members' using errcode = '42501';
+  end if;
+
+  if p_angler_id = v_owner then
+    raise exception 'OWNER_CANNOT_LEAVE: delete the league instead'
+      using errcode = '22023';
+  end if;
+
+  delete from mini_league_members
+  where mini_league_id = p_mini_league_id and angler_id = p_angler_id;
+end; $$;
+
+revoke all on function public.remove_mini_league_member(uuid, uuid) from public, anon;
+grant execute on function public.remove_mini_league_member(uuid, uuid) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- Joining with a code.
+--
+-- Matched case-insensitively because a code that has been read out over the
+-- phone gets typed however the person feels. Returns the league so the caller
+-- can go straight to it; a wrong code is told so plainly rather than silently
+-- doing nothing.
+-- ---------------------------------------------------------------------------
+create or replace function public.join_mini_league(p_code text)
+returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_id uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'must be signed in' using errcode = '42501';
+  end if;
+
+  select m.id into v_id
+  from mini_leagues m
+  where upper(trim(m.join_code)) = upper(trim(p_code));
+
+  if v_id is null then
+    raise exception 'NO_SUCH_LEAGUE: no mini league has that code'
+      using errcode = 'P0002';
+  end if;
+
+  insert into mini_league_members (mini_league_id, angler_id)
+  values (v_id, auth.uid())
+  on conflict do nothing;
+
+  return v_id;
+end; $$;
+
+revoke all on function public.join_mini_league(text) from public, anon;
+grant execute on function public.join_mini_league(text) to authenticated, service_role;
