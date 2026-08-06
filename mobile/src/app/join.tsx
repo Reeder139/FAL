@@ -34,6 +34,7 @@ const BENEFITS = [
   { icon: 'medal-outline', text: 'Six £1,500 prizes, one for each division winner' },
   { icon: 'gift-outline', text: 'Tackle bundles and vouchers for monthly comp winners' },
   { icon: 'stats-chart-outline', text: 'Your catches count towards the real league table' },
+  { icon: 'people-outline', text: 'Create mini leagues for syndicates and friends' },
   { icon: 'ellipse-outline', text: 'A gold ring on your avatar, wherever you appear' },
 ] as const;
 
