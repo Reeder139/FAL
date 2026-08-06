@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { LeagueTable } from '@/components/league-table';
+import { DivisionPrizeBanner } from '@/components/division-prize-banner';
 import { TabScreen } from '@/components/tab-screen';
 import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -51,6 +52,10 @@ export default function DivisionStandingsScreen() {
             {standings && <Text style={[Typography.bodySmall, { color: accent }]}>{standings.seasonName}</Text>}
           </View>
         </View>
+
+        {/* Above the branches: what the division is worth does not depend on
+          * whether its standings loaded. */}
+        <DivisionPrizeBanner />
 
         {loading ? (
           <ActivityIndicator color={theme.primary} style={styles.loading} />

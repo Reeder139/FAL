@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { DivisionPrizeBanner } from '@/components/division-prize-banner';
 import { TabScreen } from '@/components/tab-screen';
 import {
   Colors,
@@ -131,6 +132,12 @@ export default function LeagueScreen() {
         </Text>
       </View>
 
+      {/* Outside the branches too: what a division is worth is true whether
+        * or not a season is currently open. */}
+      <View style={styles.prizeBanner}>
+        <DivisionPrizeBanner />
+      </View>
+
       {loading ? (
         <ActivityIndicator color={theme.primary} style={styles.loading} />
       ) : !overview ? (
@@ -188,6 +195,14 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.four,
+    paddingBottom: Spacing.two,
+  },
+  /* Matches the content column so the banner lines up with the cards. */
+  prizeBanner: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.two,
   },
   backButton: {
