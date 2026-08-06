@@ -196,6 +196,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: Spacing.two,
     padding: Spacing.three,
+    // The watermark rises into this band and, being a later sibling, would
+    // paint over the Follow button — 37x16px of it, measured. The button is
+    // an interactive control with a solid fill, so it has to sit on top.
+    // The band itself has no background of its own, so the mark still shows
+    // through everywhere the controls aren't.
+    zIndex: 1,
   },
   headerIdentity: {
     flexDirection: 'row',
@@ -218,7 +224,10 @@ const styles = StyleSheet.create({
   },
   watermark: {
     position: 'absolute',
-    top: PostWatermark.inset,
+    // Negative, so the mark rises out of the photo and onto the header band
+    // above it. photoWrapper doesn't clip, and the card does — so it lands
+    // across the join without escaping the card's rounded corner.
+    top: -PostWatermark.riseAbovePhoto,
     right: PostWatermark.inset,
     width: PostWatermark.size,
     height: PostWatermark.size,

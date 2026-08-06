@@ -552,7 +552,21 @@ export const LeagueFishThumb = { size: 18, overlap: 6 } as const;
  * Sits opposite the weight badge, which is bottom-left, so the two never
  * meet whatever the photo is.
  */
-export const PostWatermark = { size: 40, opacity: 0.85, inset: Spacing.two } as const;
+export const PostWatermark = {
+  size: 84,
+  opacity: 0.85,
+  inset: Spacing.two,
+  /** How far the mark rises above the photo, onto the card's blue header
+   * band. Applied as a negative `top` inside the photo wrapper rather than
+   * by positioning against the header's height: the header's depth comes
+   * from its tallest child at runtime, and onLayout does not fire for these
+   * nodes on react-native-web, so anything derived from a measurement would
+   * sit at its initial value forever.
+   *
+   * The card clips to its own rounded corner, so the mark can overflow the
+   * photo without escaping the card. */
+  riseAbovePhoto: 46,
+} as const;
 
 /**
  * The gold ring that marks a paid member, wherever their avatar appears.
