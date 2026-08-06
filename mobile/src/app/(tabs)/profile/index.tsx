@@ -8,6 +8,7 @@ import { ProfileHeader } from '@/components/profile-header';
 import { TabScreen } from '@/components/tab-screen';
 import { UnderReviewBanner } from '@/components/under-review-banner';
 import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
+import { CreateMiniLeague } from '@/components/create-mini-league';
 import { fetchPaidMemberIds } from '@/lib/paidMembers';
 import { useTheme } from '@/hooks/use-theme';
 import { pickAndUploadAvatar } from '@/lib/avatarUpload';
@@ -125,6 +126,13 @@ export default function ProfileScreen() {
                 {avatarError}
               </Text>
             )}
+
+            {/* Directly under the PB box: starting a league is the one thing
+              * on this screen that creates something, and it is a paid
+              * feature, so it sits with the other things that describe the
+              * angler rather than down among the settings rows. Renders
+              * nothing at all for free members. */}
+            <CreateMiniLeague canCreate={isPaidMember} />
 
             {/* Above the catch grid on purpose: a catch that stopped scoring
               * is the most urgent thing on this screen, and it explains a
