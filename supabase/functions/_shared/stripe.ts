@@ -3,8 +3,11 @@
 // The Supabase admin client here deliberately does NOT use the auto-injected
 // SUPABASE_SERVICE_ROLE_KEY. This project has moved to Supabase's new API key
 // system and disabled the legacy anon/service_role JWTs, so that injected
-// variable now holds a key the API rejects with 401. SUPABASE_SECRET_KEY is
-// set explicitly and holds the sb_secret_ key instead.
+// variable now holds a key the API rejects with 401.
+//
+// The replacement is read from SECRET_KEY, not SUPABASE_SECRET_KEY: Supabase
+// reserves the SUPABASE_ prefix for its own injected variables and refuses to
+// store a custom secret using it.
 //
 // It falls back to the injected one so this keeps working on a project that
 // has not migrated, rather than failing in a way that looks like a Stripe
@@ -26,8 +29,8 @@ export function stripeClient(): Stripe {
 
 export function adminClient(): SupabaseClient {
   const url = Deno.env.get('SUPABASE_URL')!;
-  const key = Deno.env.get('SUPABASE_SECRET_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!key) throw new Error('SUPABASE_SECRET_KEY is not set');
+  const key = Deno.env.get('SECRET_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!key) throw new Error('SECRET_KEY is not set');
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
