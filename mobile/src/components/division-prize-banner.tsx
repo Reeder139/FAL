@@ -52,6 +52,10 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
+    // Owned by the banner rather than left to each screen: the division
+    // page lays its children out with no gap, so the stats strip sat flush
+    // against this and the two read as one box with a line through it.
+    marginBottom: Spacing.three,
     // A column now the prize is two claims rather than one: the £1,500 for
     // winning the division, and what winning it qualifies you for.
     gap: Spacing.one,

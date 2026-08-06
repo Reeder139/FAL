@@ -203,7 +203,6 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     paddingHorizontal: Spacing.four,
-    paddingBottom: Spacing.two,
   },
   backButton: {
     width: 36,
