@@ -50,7 +50,12 @@ function LeagueLink({
         pressed && styles.linkPressed,
       ]}>
       <Image source={icon} style={styles.linkIcon} resizeMode="contain" />
-      <Text style={[Typography.bodySmall, { color: theme.text, fontWeight: '700' }]} numberOfLines={1}>
+      {/* Two lines allowed: "Mini Leagues" does not fit a third of a 375px
+        * row on one. The row stretches its children, so the taller pill sets
+        * the height and all three stay level. */}
+      <Text
+        style={[Typography.bodySmall, styles.linkLabel, { color: theme.text, fontWeight: '700' }]}
+        numberOfLines={2}>
         {label}
       </Text>
     </Pressable>
@@ -208,14 +213,22 @@ const styles = StyleSheet.create({
   },
   link: {
     flex: 1,
-    flexDirection: 'row',
+    // Stacked, not side by side. Three of these share the row now, and at a
+    // third of a 375px screen the label had about 45px next to the icon —
+    // enough to truncate "Mini Leagues" to almost nothing. Beneath it, the
+    // label gets the pill's full width.
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.two,
+    gap: Spacing.one,
     borderWidth: 1,
-    borderRadius: Radii.pill,
-    paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.three,
+    // No longer a lozenge: at this height a 999 radius bows the sides in and
+    // eats the corners the label needs.
+    borderRadius: Radii.md,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.one,
+  },
+  linkLabel: {
+    textAlign: 'center',
   },
   linkPressed: {
     opacity: 0.7,
