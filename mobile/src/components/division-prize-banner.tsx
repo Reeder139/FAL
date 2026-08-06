@@ -30,15 +30,18 @@ export function DivisionPrizeBanner() {
         end={{ x: 1, y: 1 }}
         style={styles.wash}
       />
-      <Ionicons name="trophy" size={18} color={theme.gold} />
-      {/* bodySmall, not body: at 15px this line came 9px short of fitting a
-        * 375px screen and wrapped, leaving "free" orphaned on a second line
-        * — worse than a slightly smaller headline. At 13px bold it clears a
-        * 320px viewport with room to spare, and the gold border, wash and
-        * trophy carry the prominence that the extra 2px would have. It also
-        * matches the join-date notice on the same screens. */}
-      <Text style={[Typography.bodySmall, styles.text, { color: theme.text }]}>
-        Win your division to win £1,500 tax free
+      <View style={styles.headline}>
+        <Ionicons name="trophy" size={18} color={theme.gold} />
+        {/* bodySmall, not body: at 15px this line came 9px short of fitting
+          * a 375px screen and wrapped, orphaning "free" on a second line.
+          * At 13px bold it holds one line down to 360px. */}
+        <Text style={[Typography.bodySmall, styles.headlineText, { color: theme.text }]}>
+          Win your division to win £1,500 tax free
+        </Text>
+      </View>
+      <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>
+        And qualify for the grand final — 48 hours against five other winners at a top venue, for
+        the <Text style={{ color: theme.gold, fontWeight: FontWeight.bold }}>£20,000 grand prize</Text>.
       </Text>
     </View>
   );
@@ -49,9 +52,9 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
+    // A column now the prize is two claims rather than one: the £1,500 for
+    // winning the division, and what winning it qualifies you for.
+    gap: Spacing.one,
     borderWidth: 1,
     borderRadius: Radii.md,
     paddingVertical: Spacing.three,
@@ -69,7 +72,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  text: {
+  headline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  headlineText: {
     flex: 1,
     fontWeight: FontWeight.bold,
   },
