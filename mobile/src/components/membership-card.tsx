@@ -6,9 +6,20 @@ import { Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchMembership, openBillingPortal, type MembershipState } from '@/lib/membership';
 
-/** 6 September 2026 — the date matters here, not how long away it is. */
+/** 6 September 2026 — the date matters here, not how long away it is.
+ *
+ * Formatted in UTC, deliberately. Stripe renders billing dates in UTC, and a
+ * period ending at 23:18 UTC is the next day in BST — so a member looking at
+ * this card and at Stripe's own portal saw two different dates for the same
+ * event. Whichever is more "correct" locally, they have to agree, and Stripe
+ * is the one actually taking the money. */
 function longDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
 }
 
 /**
