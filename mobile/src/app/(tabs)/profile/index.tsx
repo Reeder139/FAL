@@ -9,6 +9,7 @@ import { TabScreen } from '@/components/tab-screen';
 import { UnderReviewBanner } from '@/components/under-review-banner';
 import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { CreateMiniLeague } from '@/components/create-mini-league';
+import { MembershipCard } from '@/components/membership-card';
 import { fetchPaidMemberIds } from '@/lib/paidMembers';
 import { useTheme } from '@/hooks/use-theme';
 import { pickAndUploadAvatar } from '@/lib/avatarUpload';
@@ -132,6 +133,12 @@ export default function ProfileScreen() {
               * feature, so it sits with the other things that describe the
               * angler rather than down among the settings rows. Renders
               * nothing at all for free members. */}
+            {/* Above the mini league button: what you are paying for, and
+              * the way to stop, belong with the account rather than with the
+              * things the account lets you do. Renders nothing for anyone who
+              * has never subscribed. */}
+            <MembershipCard />
+
             <CreateMiniLeague canCreate={isPaidMember} />
 
             {/* Above the catch grid on purpose: a catch that stopped scoring
