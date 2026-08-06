@@ -105,3 +105,36 @@ export async function fetchFeedPage(tab: FeedTab, cursor: string | null): Promis
     nextCursor: rows.length === PAGE_SIZE ? items[items.length - 1].created_at : null,
   };
 }
+
+/**
+ * One post, enriched exactly as a feed page enriches its rows.
+ *
+ * Reads feed_all rather than posts directly so a post the viewer is not
+ * allowed to see — a `hidden` or `followers` visibility they do not satisfy
+ * — comes back empty rather than half-rendered. The view already encodes
+ * that rule; repeating it here would be a second copy to keep in step.
+ */
+export async function fetchPost(postId: string): Promise<FeedItemWithPhoto | null> {
+  const { data: row, error } = await supabase
+    .from('feed_all')
+    .select('*')
+    .eq('post_id', postId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row) return null;
+
+  const [{ data: media }, likedPostIds, commentsByPost] = await Promise.all([
+    supabase.from('post_media').select('post_id, storage_path').eq('post_id', postId).eq('media_role', 'hero'),
+    fetchLikedPostIds([postId]),
+    fetchRecentCommentsForPosts([postId]),
+  ]);
+  const heroPath = (media ?? [])[0]?.storage_path ?? null;
+
+  return {
+    ...row,
+    avatar_path: row.avatar_path ? getPublicStorageUrl('post-media', row.avatar_path) : null,
+    photo_url: heroPath ? getPublicStorageUrl('post-media', heroPath) : null,
+    liked_by_viewer: likedPostIds.has(postId),
+    recent_comments: commentsByPost.get(postId) ?? [],
+  };
+}
