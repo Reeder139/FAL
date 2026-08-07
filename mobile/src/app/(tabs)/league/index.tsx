@@ -124,7 +124,23 @@ export default function NationalLeagueScreen() {
         </View>
 
         <View style={styles.header}>
-          <Text style={[Typography.h1, { color: theme.text }]}>National League</Text>
+          {/* The season rides the title rather than sitting under it, so the
+            * heading reads as one thing — "National League — Summer 2026" —
+            * instead of a title with a stray date beneath it.
+            *
+            * A row that wraps, not a single Text: the season stays at
+            * bodySmall against the title's h1, which a nested Text could do
+            * but a wrap could not. If the pair ever outgrows the width, the
+            * season drops to its own line whole rather than the dash
+            * stranding itself at the end of the first. */}
+          <View style={styles.titleRow}>
+            <Text style={[Typography.h1, { color: theme.text }]}>National League</Text>
+            {standings && (
+              <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>
+                — {standings.seasonName}
+              </Text>
+            )}
+          </View>
           {/* The counterpart to the divisional tables' gold line. Primary
             * rather than gold on purpose: gold means paid membership
             * throughout the app, and this is the league that doesn't need
@@ -132,9 +148,6 @@ export default function NationalLeagueScreen() {
           <Text style={[Typography.caption, { color: theme.primary }]}>
             All players&rsquo; best fish count in this league
           </Text>
-          {standings && (
-            <Text style={[Typography.bodySmall, { color: theme.textSecondary }]}>{standings.seasonName}</Text>
-          )}
         </View>
 
         {loading ? (
@@ -186,6 +199,14 @@ const styles = StyleSheet.create({
   header: {
     paddingVertical: Spacing.one,
     gap: Spacing.half,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    // Baseline, not centre: the two sit on the same line of text, and
+    // centring a 13px label against a 24px title floats it visibly high.
+    alignItems: 'baseline',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
   },
   loading: {
     flex: 1,
