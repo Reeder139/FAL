@@ -699,6 +699,84 @@ export default async function ({ params, user }) {
 ```
 
 ```ts
+// comp_membership — grant membership without payment, for beta testers and
+// the Atomic Tackle team. Returns what it did, so surface it: the three
+// answers are "comped from season start", "comped from today" and "already a
+// competitor".
+//
+// backdate is the decision that matters, not a checkbox to leave alone:
+//   false — competitor from now. Fish they have already logged keep counting
+//           in the National League, where everyone's best fish count, but
+//           score nothing towards their division's £1,500.
+//   true  — backdated to the season's start, so everything caught this season
+//           counts in the division too. This deliberately grants what the
+//           "paid fish only" rule normally prevents, so ask for it on purpose.
+//
+// A comp is NOT a fake subscription — no Stripe row is created, and none
+// should be. It is a `competitor` stint, which is what is_paid_member(), the
+// gold ring, mini leagues and the divisional tables all actually read.
+export default async function ({ params, user }) {
+  const { userId, backdate, reason } = params
+  if (!reason?.trim()) throw new Error('A reason is required.')
+
+  const result = await carpLeaguesAdmin.query(
+    `with actor as (select set_config('app.admin_actor', $1, true))
+     select public.comp_membership($2::uuid, $3::boolean, $4::text) as outcome from actor`,
+    [user.email, userId, !!backdate, reason.trim()]
+  )
+  return { success: true, outcome: result.data[0]?.outcome }
+}
+```
+
+```ts
+// end_membership — the undo for a comp. Closes the open competitor stint,
+// leaving exactly the shape a lapsed subscription leaves.
+//
+// Safe on a paying member, but it cancels nothing at Stripe: they keep being
+// charged and the next webhook reopens a stint. Cancel in Stripe instead, or
+// have them use the billing portal.
+export default async function ({ params, user }) {
+  const { userId, reason } = params
+  if (!reason?.trim()) throw new Error('A reason is required.')
+
+  const result = await carpLeaguesAdmin.query(
+    `with actor as (select set_config('app.admin_actor', $1, true))
+     select public.end_membership($2::uuid, $3::text) as outcome from actor`,
+    [user.email, userId, reason.trim()]
+  )
+  return { success: true, outcome: result.data[0]?.outcome }
+}
+```
+
+```sql
+-- Membership state for the member table. Comped members are the ones with a
+-- competitor stint and no subscription behind it — there is no flag for it,
+-- and there should not be: a comp is a membership someone granted rather than
+-- a different kind of membership.
+select
+  p.id,
+  p.username,
+  p.display_name,
+  se.tier,
+  se.joined_at,
+  d.name as division,
+  s.status as stripe_status,
+  case
+    when se.tier is distinct from 'competitor' then 'free'
+    when s.angler_id is null                   then 'comped'
+    else 'paying'
+  end as membership
+from profiles p
+left join season_entries se
+  on se.angler_id = p.id
+ and se.season_id = (select id from seasons where status = 'running' limit 1)
+ and se.left_at is null
+left join divisions d on d.id = se.division_id
+left join subscriptions s on s.angler_id = p.id
+order by p.created_at desc;
+```
+
+```ts
 // trigger_password_reset — returns a pg_net request id. Fire and forget:
 // the audit row records that we asked, not that the email arrived.
 export default async function ({ params, user }) {
