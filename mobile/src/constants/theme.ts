@@ -572,8 +572,12 @@ export const LeagueFishThumb = { size: 18, overlap: 6 } as const;
  * Sits opposite the weight badge, which is bottom-left, so the two never
  * meet whatever the photo is.
  */
+/** Declared outside the object so `headerReserve` can be derived from it and
+ * the two cannot drift apart. */
+const PostWatermarkSize = 84;
+
 export const PostWatermark = {
-  size: 84,
+  size: PostWatermarkSize,
   opacity: 0.85,
   inset: Spacing.two,
   /** How far the mark rises above the photo, onto the card's blue header
@@ -586,6 +590,24 @@ export const PostWatermark = {
    * The card clips to its own rounded corner, so the mark can overflow the
    * photo without escaping the card. */
   riseAbovePhoto: 46,
+  /** Width the post header keeps clear on its right, so its controls never
+   * run under the mark.
+   *
+   * The Follow pill used to sit at the far right of that band and the two
+   * fought over the same corner — the pill won, on top of the logo. Moving it
+   * beside the angler's name frees the corner, but only a reserved band keeps
+   * it free: a long username would otherwise push the pill back across, since
+   * flex only starts shrinking once the row has already overflowed.
+   *
+   * Size plus inset, because that is the mark's real footprint from the card's
+   * right edge — the artwork is square and fills its `contain` box, so it is
+   * 84 wide sitting 8 in. Reserving only the size left the pill clipping the
+   * mark's left edge by exactly the inset.
+   *
+   * Costs nothing when the name is short: the row is left-aligned, so this is
+   * simply the empty space the mark occupies. It only bites on a long name,
+   * which is when it should. */
+  headerReserve: PostWatermarkSize + Spacing.two,
 } as const;
 
 /**

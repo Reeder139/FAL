@@ -149,9 +149,19 @@ export default function MiniLeagueScreen() {
                 )}
               </Pressable>
               <View style={styles.rowBody}>
-                <Text style={[Typography.bodySmall, { color: theme.text }]} numberOfLines={1}>
-                  {row.username}
-                </Text>
+                {/* Its own target, like the avatar beside it and like the
+                  * national and divisional tables — a name in a standing is
+                  * the way to that angler's profile everywhere else, and this
+                  * was the one table where it wasn't. */}
+                <Pressable
+                  onPress={() => openAngler(row.anglerId)}
+                  accessibilityRole="link"
+                  accessibilityLabel={`View ${row.username}'s profile`}
+                  style={styles.nameButton}>
+                  <Text style={[Typography.bodySmall, { color: theme.text }]} numberOfLines={1}>
+                    {row.username}
+                  </Text>
+                </Pressable>
                 <Text style={[Typography.caption, { color: theme.textMuted }]}>
                   {row.countingFish} {row.countingFish === 1 ? 'fish' : 'fish'}
                   {row.bestFishOz !== null ? ` · best ${formatWeightOz(row.bestFishOz)}` : ''}
@@ -239,5 +249,11 @@ const styles = StyleSheet.create({
   rowBody: {
     flex: 1,
     gap: Spacing.half,
+  },
+  /** Hugs the name rather than filling the row, so the tap target is the
+   * name itself and not the empty space beside it. */
+  nameButton: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
   },
 });

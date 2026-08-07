@@ -85,7 +85,12 @@ export function PostCard({ item, viewerId, followingIds, isPaidMember }: PostCar
               ]}
             />
           )}
-          <Text style={[Typography.h3, { color: theme.text }]}>{item.username}</Text>
+          {/* One line: the row now has a pill after it and a reserved band
+            * beyond that, so an unbounded name would push the pill across the
+            * watermark before flex ever got the chance to shrink it. */}
+          <Text style={[Typography.h3, { color: theme.text }]} numberOfLines={1}>
+            {item.username}
+          </Text>
         </Pressable>
         {viewerId !== null && !isSelf && (
           <FollowButton anglerId={item.author_id} initialIsFollowing={followingIds.has(item.author_id)} size="small" />
@@ -193,21 +198,26 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: Spacing.two,
     padding: Spacing.three,
-    // The watermark rises into this band and, being a later sibling, would
-    // paint over the Follow button — 37x16px of it, measured. The button is
-    // an interactive control with a solid fill, so it has to sit on top.
-    // The band itself has no background of its own, so the mark still shows
-    // through everywhere the controls aren't.
+    // Left-aligned, so the Follow pill sits beside the name rather than out
+    // at the right edge where the watermark rises. The reserve is what keeps
+    // it there — see PostWatermark.headerReserve.
+    paddingRight: PostWatermark.headerReserve,
+    // Kept even though nothing should now overlap: the mark is a later
+    // sibling and would paint over this band's contents if a layout change
+    // ever let them meet again. Decoration must not win against a name or a
+    // control. The band has no background of its own, so the mark still shows
+    // through everywhere they aren't.
     zIndex: 1,
   },
   headerIdentity: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    flex: 1,
+    // Shrinks rather than grows: growing pushed the pill to the far right,
+    // which is the collision this avoids. A long name ellipsises instead.
+    flexShrink: 1,
   },
   avatar: {
     width: Spacing.five,
