@@ -57,13 +57,17 @@ type RowProps = {
   /** Gold ring on the avatar. Resolved once for the whole table rather
    * than per row. */
   isPaidMember: boolean;
+  /** Which competition this table is, so the counting-fish link opens the
+   * same five fish the row was scored on. */
+  scope: 'national' | 'division';
   row: LeagueTableRow;
   showDivisionBadge: boolean;
   onJoin: () => void;
 };
 
-function TableRow({ row, showDivisionBadge, onJoin, isPaidMember }: RowProps) {
+function TableRow({ row, showDivisionBadge, onJoin, isPaidMember, scope }: RowProps) {
   const theme = useTheme();
+  const router = useRouter();
   const openAngler = useOpenAngler();
   // Falls back to primary when the angler sits in no division — the badge is
   // hidden in that case anyway, but the colour is read before that is known.
@@ -71,6 +75,14 @@ function TableRow({ row, showDivisionBadge, onJoin, isPaidMember }: RowProps) {
     row.divisionRank !== null ? theme[DIVISION_COLOR_KEYS[(row.divisionRank - 1) % 3]] : theme.primary;
   const hasScored = row.countingFish > 0;
   const openProfile = () => openAngler(row.anglerId);
+  // Scope travels with the link: the same angler's counting fish legitimately
+  // differ between the two tables, because a division counts only fish caught
+  // inside a paid stint.
+  const openCountingFish = () =>
+    router.push({
+      pathname: '/league/counting/[id]',
+      params: { id: row.anglerId, scope },
+    });
 
   return (
     <View
@@ -111,10 +123,14 @@ function TableRow({ row, showDivisionBadge, onJoin, isPaidMember }: RowProps) {
         )}
       </Pressable>
 
-      {/* The counting fish, next to the angler they belong to. Not tappable:
-        * the whole strip would otherwise compete with the name beside it for
-        * taps on a row that's already only 36px tall, and the fish are here
-        * as a glance at what earned the position, not as navigation.
+      {/* The counting fish, next to the angler they belong to — and a way in
+        * to all of them. The fish deciding the top of a table are the ones
+        * worth a second look, and the membership is a far larger review team
+        * than the admin console will ever be.
+        *
+        * A sibling of the name's Pressable rather than wrapping it: on web a
+        * tap inside a nested Pressable fires both handlers, so a tap on the
+        * strip would open the angler's profile on its way past.
         *
         * Never on a ghost row. That row already spends its name line on the
         * Join call-to-action, and the strip on top of it left the name
@@ -123,10 +139,11 @@ function TableRow({ row, showDivisionBadge, onJoin, isPaidMember }: RowProps) {
         * keeps their strip in the national table, where they take an
         * ordinary numbered row with no pill. */}
       {row.countingFishPhotos.length > 0 && !row.isGhost && (
-        <View
-          style={styles.fishStrip}
-          accessibilityRole="image"
-          accessibilityLabel={`${row.countingFishPhotos.length} of ${row.username}'s counting fish`}>
+        <Pressable
+          onPress={openCountingFish}
+          accessibilityRole="link"
+          accessibilityLabel={`See ${row.username}'s ${row.countingFishPhotos.length} counting fish`}
+          style={({ pressed }) => [styles.fishStrip, pressed && styles.pressed]}>
           {row.countingFishPhotos.map((uri, i) => (
             <Image
               key={uri}
@@ -135,7 +152,7 @@ function TableRow({ row, showDivisionBadge, onJoin, isPaidMember }: RowProps) {
               resizeMode="cover"
             />
           ))}
-        </View>
+        </Pressable>
       )}
 
       <View style={styles.rowInfo}>
@@ -305,6 +322,7 @@ export function LeagueTable({ divisionId, showDivisionBadge = false }: LeagueTab
   // the list must not cut the angler reading it out of their own league, which
   // is what youBelowCap is for.
   const { shown, capped, youBelowCap } = selectVisibleRows(rows, divisionId);
+  const scope = divisionId === null ? 'national' : 'division';
 
   const ghostIndex = shown.findIndex((r) => r.isGhost);
   const ghost = ghostIndex >= 0 ? shown[ghostIndex] : null;
@@ -362,6 +380,7 @@ export function LeagueTable({ divisionId, showDivisionBadge = false }: LeagueTab
             showDivisionBadge={showDivisionBadge}
             onJoin={goToJoin}
             isPaidMember={paidIds.has(row.anglerId)}
+            scope={scope}
           />
         ))}
         {/* Says the list is a top 50 rather than everyone, so a member who
@@ -386,6 +405,7 @@ export function LeagueTable({ divisionId, showDivisionBadge = false }: LeagueTab
             showDivisionBadge={showDivisionBadge}
             onJoin={goToJoin}
             isPaidMember={paidIds.has(pinned.anglerId)}
+            scope={scope}
           />
         </View>
       )}
