@@ -7,7 +7,7 @@ import { CatchGrid } from '@/components/catch-grid';
 import { ProfileHeader } from '@/components/profile-header';
 import { TabScreen } from '@/components/tab-screen';
 import { UnderReviewBanner } from '@/components/under-review-banner';
-import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
+import { FontWeight, MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { CreateMiniLeague } from '@/components/create-mini-league';
 import { MembershipCard } from '@/components/membership-card';
 import { fetchPaidMemberIds } from '@/lib/paidMembers';
@@ -23,7 +23,11 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { profile, signOut, refreshProfile } = useAuth();
   const [changingAvatar, setChangingAvatar] = useState(false);
-  const [isPaidMember, setIsPaidMember] = useState(false);
+  // null until the lookup answers. Distinct from false on purpose: starting
+  // at false would flash the join prompt below at a paying member on every
+  // visit, which is the same upsell-at-a-member bug leagueSummary's store
+  // was rewritten to stop.
+  const [isPaidMember, setIsPaidMember] = useState<boolean | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [bestVerifiedOz, setBestVerifiedOz] = useState<number | null>(null);
 
@@ -108,7 +112,7 @@ export default function ProfileScreen() {
         {profile && (
           <>
             <ProfileHeader
-              isPaidMember={isPaidMember}
+              isPaidMember={isPaidMember === true}
               anglerId={profile.id}
               avatarUrl={avatarUrl}
               displayName={profile.display_name}
@@ -128,6 +132,28 @@ export default function ProfileScreen() {
               </Text>
             )}
 
+            {/* The invitation to join, and the only one left — the banner
+              * that used to ride the League Position strip on every tab is
+              * gone. High on the profile because this is the screen that is
+              * about you rather than about the competition, and it stays put
+              * until they join rather than being dismissible.
+              *
+              * `=== false` and not `!isPaidMember`: null means the lookup has
+              * not answered yet, and treating that as "free" would flash this
+              * at a paying member every time they opened the tab. */}
+            {isPaidMember === false && (
+              <Pressable
+                onPress={() => router.push('/join')}
+                accessibilityRole="button"
+                hitSlop={Spacing.two}
+                style={({ pressed }) => [styles.joinPrompt, pressed && styles.joinPromptPressed]}>
+                <Text style={[Typography.body, styles.joinPromptText, { color: theme.gold }]}>
+                  Join now to play in the Big Leagues for the £20,000 grand prize plus other prizes
+                  and benefits
+                </Text>
+              </Pressable>
+            )}
+
             {/* Directly under the PB box: starting a league is the one thing
               * on this screen that creates something, and it is a paid
               * feature, so it sits with the other things that describe the
@@ -139,7 +165,7 @@ export default function ProfileScreen() {
               * has never subscribed. */}
             <MembershipCard />
 
-            <CreateMiniLeague canCreate={isPaidMember} />
+            <CreateMiniLeague canCreate={isPaidMember === true} />
 
             {/* Above the catch grid on purpose: a catch that stopped scoring
               * is the most urgent thing on this screen, and it explains a
@@ -182,6 +208,23 @@ const styles = StyleSheet.create({
   avatarError: {
     textAlign: 'center',
     marginBottom: Spacing.three,
+  },
+  joinPrompt: {
+    marginBottom: Spacing.three,
+    paddingHorizontal: Spacing.one,
+  },
+  joinPromptPressed: {
+    opacity: 0.7,
+  },
+  joinPromptText: {
+    // Bold and underlined rather than a filled button: it has to read as an
+    // invitation in the angler's own words, and it sits directly under the
+    // profile header where a solid block would compete with the identity
+    // above it. The underline is what says it can be tapped, since without
+    // a button shape nothing else does.
+    fontWeight: FontWeight.bold,
+    textDecorationLine: 'underline',
+    textAlign: 'center',
   },
   content: {
     width: '100%',

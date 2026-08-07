@@ -175,8 +175,6 @@ Don't invent new division colors per screen — always pull `divisionOne` /
 | `MaxContentWidth` | 800 | Content column cap on wide/web viewports — every screen centers within this instead of stretching edge to edge |
 | `BottomTabInset` | 50 (iOS) / 80 (Android) / 0 (web) | Extra bottom padding on scrollable content so it clears the native tab bar |
 | `SuggestedFollowsRailHeight` | 146 | Feed's suggested-follows rail — fits a circular avatar plus name, division/position and the follow button (card height is `avatar + 64`, so 140px at the widest avatar) |
-| `LeagueStripBannerHeight` | `{ min: 28, max: 60 }` | Join banner in the League Position strip, clamped — see below |
-| `LeagueStripTextMinWidth` | 208 | Width the strip reserves for its text column before sizing the banner |
 | `SearchIconSize` | 28 | Member-search icon on the feed, right-aligned on the tab pills' row |
 | `NavIconSize` | 42 | Bottom nav bar icons — bounded by tab width (~62px at 360), not height |
 | `NavBadge` | 18 tall, 2px ring, −2/−2 offset | Unread-count badge on the Activity tab's bell |
@@ -277,64 +275,27 @@ and the badge reads as part of the bell rather than as something on top of it.
 
 Native doesn't use any of this: `NativeTabs.Trigger.Badge` hands the count to
 the OS, which draws and places it to platform convention.
+### The League Position strip, and where joining lives
 
-### The League Position strip's join banner
+The strip states where you stand and taps through to the league. That is all it
+does.
 
-The banner is sized by **height**, not width, and the width follows from the
-artwork's fixed 3.7:1 ratio. That ordering is the whole design: the banner is
-the tallest thing in the row, so it sets the strip's depth and the strip hugs
-it — which is what makes the artwork read as *filling* the strip rather than
-floating in it.
+It used to carry a join banner for free members — artwork advertising the
+£20,000 prize, on every tab screen. The banner set the strip's depth, so it
+came with width arithmetic to keep the text on one line, a clamped height
+range, and a rule that the shipped asset had to be flush with its own edges or
+the dead space showed up inside the box. All of that existed only to place it,
+and all of it is gone with it: `LeagueStripBannerHeight`,
+`LeagueStripTextMinWidth`, and the `useWindowDimensions` measurement that fed
+them.
 
-It can't simply take a share of the row, though, because it shares that row
-with the standings. At 3.7:1, height buys width fast, and every pixel of width
-the banner takes comes off the text column; once "Your Current League Position"
-no longer fits on one line it wraps, and the wrap deepens the strip by more
-than the taller banner gained. So the strip reserves `LeagueStripTextMinWidth`
-for the text first, gives the leftover width to the banner, and clamps the
-resulting height to `LeagueStripBannerHeight`. Measured result:
+The invitation now lives on the profile instead — bold, underlined, high on the
+screen, shown only while `isPaidMember === false` and gone the moment they
+join. One place rather than every screen, and on the one screen that is about
+the angler rather than about the competition.
 
-| Viewport | Strip | Banner | Space above/below |
-|---|---|---|---|
-| 360 | 44 | 101×20 | 12 |
-| 390 | 44 | 131×26 | 9 |
-| ≥560 | 70 | 302×60 | 5 |
-
-Space above and below is equal at every width — the difference measures 0.
-
-The banner is always vertically centred in the strip, and the strip hugs it:
-past the point where the text column stops being the tallest thing in the row,
-strip height is just the banner plus the container's padding. So "fill the
-strip better" means a bigger banner and a deeper strip together — they can't
-move independently. The `max` is the lever, and it only bites above ~534px
-wide; phones sit below it and are sized by the width left over instead, which
-is why the banner doesn't reach full height there.
-
-**`JOIN_BANNER_RATIO` must match the shipped asset exactly, and the asset must
-be flush with its own edges.** The box is drawn at that ratio and the image is
-`contain`-fitted into it, so any margin baked into the artwork becomes dead
-space *inside* the box — which centring the box in the strip cannot fix,
-because the box is already centred. Chasing this in the layout is wasted
-effort; measure the asset instead.
-
-It bit twice, both times as "more space below than above":
-
-1. The crop box came from which pixels the backdrop flood-fill had touched
-   rather than from alpha, so transparency already present in the source
-   counted as content — 56px of empty padding baked into the bottom.
-2. After that was fixed, the badge's shadow tapered out below it. Sparse rows
-   still extended the box, and downsampling then softened the bottom edge more
-   than the top, leaving ~5 rows too faint to see but still inside the frame.
-
-Hence `prepare-join-banner.mjs` crops twice: once on the source (ignoring rows
-thinner than `SPARSE_FRACTION`), then again on the *resized* pixels against
-`SOLID_ALPHA`. The second pass is the one that guarantees it, whatever the
-resampler does. Re-run the script if the art changes and update the ratio
-constant to the new dimensions.
-
-**Don't size this from the strip's own height** (`alignSelf: 'stretch'` plus
-`aspectRatio`), which looks like the obvious way to make it fill. That's a
-cyclic size dependency — the strip's height depends on its children, the
-banner's width depends on the strip's height — and the browser breaks the cycle
-by laying the strip out as if the text had never wrapped, which left the
-standings overflowing the strip's border by 16px at 360.
+**That `=== false` is load-bearing.** Paid status is `boolean | null` there,
+null meaning the lookup has not answered. `!isPaidMember` would treat "don't
+know yet" as "free" and flash the upsell at a paying member every time they
+opened the tab — the same bug the league summary store was rewritten to stop
+when Stripe's webhook landed a moment after the redirect.
