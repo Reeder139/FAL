@@ -8,6 +8,7 @@ import { FontWeight, LeagueFishThumb, paidRing, Radii, Spacing, Typography } fro
 import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchLeagueTableWithGhost, type LeagueTableRow } from '@/lib/leagueTable';
+import { NATIONAL_TABLE_LIMIT, selectVisibleRows } from '@/lib/leagueVisibleRows';
 import { formatWeightOz } from '@/lib/units';
 import { fetchPaidMemberIds } from '@/lib/paidMembers';
 import { useAuth } from '@/providers/auth-provider';
@@ -299,21 +300,40 @@ export function LeagueTable({ divisionId, showDivisionBadge = false }: LeagueTab
     );
   }
 
-  const ghostIndex = rows.findIndex((r) => r.isGhost);
-  const ghost = ghostIndex >= 0 ? rows[ghostIndex] : null;
+  // The national table is a top 50; a division shows everyone in it. Rows
+  // arrive sorted by points, so this is the top of the standing — and cutting
+  // the list must not cut the angler reading it out of their own league, which
+  // is what youBelowCap is for.
+  const { shown, capped, youBelowCap } = selectVisibleRows(rows, divisionId);
+
+  const ghostIndex = shown.findIndex((r) => r.isGhost);
+  const ghost = ghostIndex >= 0 ? shown[ghostIndex] : null;
 
   // Every row is the same height by construction — the 36px avatar sets it
   // and nothing in a row wraps — so the pitch can be backed out of the
   // reported content height instead of measuring a node.
+  //
+  // Only computed when there is a ghost to place, which is what keeps it
+  // honest: the arithmetic assumes the scroll content is rows and nothing
+  // else, and the "top 50" note at the end of the list would otherwise be
+  // counted as part of a row. A ghost only exists in a divisional table and
+  // only the national one is capped, so the two never meet — gating on the
+  // ghost makes that a property of the code rather than a coincidence.
   const rowPitch =
-    scroll.content > 0 && rows.length > 0
-      ? (scroll.content - LIST_PADDING_BOTTOM + ROW_GAP) / rows.length
+    ghost && scroll.content > 0 && shown.length > 0
+      ? (scroll.content - LIST_PADDING_BOTTOM + ROW_GAP) / shown.length
       : 0;
   const ghostTop = ghostIndex * rowPitch;
   const ghostOnScreen =
     rowPitch === 0 ||
     scroll.viewport === 0 ||
     (ghostTop + rowPitch > scroll.y && ghostTop < scroll.y + scroll.viewport);
+
+  // Being cut off by the cap beats being scrolled past: that row is not in
+  // the list at any scroll position, so it stays pinned rather than appearing
+  // and disappearing. The two never both apply — a ghost only exists in a
+  // divisional table, and those are not capped.
+  const pinned = youBelowCap ?? (ghost && !ghostOnScreen ? ghost : null);
 
   return (
     <View style={styles.container} ref={containerRef}>
@@ -335,7 +355,7 @@ export function LeagueTable({ divisionId, showDivisionBadge = false }: LeagueTab
         scrollEventThrottle={16}
         onScroll={handleScroll}
         onContentSizeChange={handleContentSizeChange}>
-        {rows.map((row) => (
+        {shown.map((row) => (
           <TableRow
             key={row.isGhost ? `ghost-${row.anglerId}` : row.anglerId}
             row={row}
@@ -344,17 +364,28 @@ export function LeagueTable({ divisionId, showDivisionBadge = false }: LeagueTab
             isPaidMember={paidIds.has(row.anglerId)}
           />
         ))}
+        {/* Says the list is a top 50 rather than everyone, so a member who
+          * cannot find themselves in it knows why. Inside the list, at the
+          * end of it, because that is the moment the question occurs — and
+          * because the pinned row below is absolutely positioned and would
+          * sit on top of it out here. */}
+        {capped && (
+          <Text style={[Typography.caption, styles.capNote, { color: theme.textMuted }]}>
+            Top {NATIONAL_TABLE_LIMIT} of {rows.length} anglers
+          </Text>
+        )}
       </ScrollView>
 
-      {/* Pinned copy so a free member can always see where they'd stand,
-       * however far they've scrolled from their own position. */}
-      {ghost && !ghostOnScreen && (
+      {/* Pinned copy so an angler can always see where they stand, however
+       * far they have scrolled from their own position — or, past the cap,
+       * when their row is not in the list at all. */}
+      {pinned && (
         <View style={[styles.stickyWrapper, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
           <TableRow
-            row={ghost}
+            row={pinned}
             showDivisionBadge={showDivisionBadge}
             onJoin={goToJoin}
-            isPaidMember={paidIds.has(ghost.anglerId)}
+            isPaidMember={paidIds.has(pinned.anglerId)}
           />
         </View>
       )}
@@ -485,6 +516,10 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.8,
+  },
+  capNote: {
+    textAlign: 'center',
+    paddingTop: Spacing.two,
   },
   stickyWrapper: {
     position: 'absolute',
