@@ -158,18 +158,21 @@ export default function NationalLeagueScreen() {
           <>
             <View style={[styles.infoStrip, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <View style={styles.infoStat}>
-                <Text style={[Typography.label, { color: theme.label }]}>Anglers</Text>
-                <Text style={[Typography.body, { color: theme.text }]}>{standings.memberCount}</Text>
-              </View>
-              <View style={styles.infoStat}>
                 <Text style={[Typography.label, { color: theme.label }]}>Top score</Text>
                 <Text style={[Typography.body, { color: theme.text }]}>
                   {standings.rows[0] ? `${standings.rows[0].points.toFixed(1)} pts` : '—'}
                 </Text>
               </View>
-              <View style={styles.infoStat}>
+              {/* Takes the width the top score leaves and wraps into it. At
+                * two stats rather than three there is room for the prize to
+                * be named rather than summarised, and it needs two lines at
+                * any type size that matches the figure beside it — measured
+                * at 379px against the 256px it has. */}
+              <View style={[styles.infoStat, styles.infoStatWide]}>
                 <Text style={[Typography.label, { color: theme.label }]}>Playing for</Text>
-                <Text style={[Typography.body, { color: theme.text }]}>Top ten win prizes</Text>
+                <Text style={[Typography.body, styles.prize, { color: theme.text }]} numberOfLines={2}>
+                  National Champ Bragging Rights, Top 10 Tackle Bundles
+                </Text>
               </View>
             </View>
 
@@ -225,6 +228,17 @@ const styles = StyleSheet.create({
   },
   infoStat: {
     gap: Spacing.half,
+  },
+  infoStatWide: {
+    // Shrinks so the prize wraps inside the row rather than pushing the top
+    // score off the end of it. Right-aligned because `space-between` already
+    // pins this block to the right edge, and left-aligned text inside a
+    // right-pinned block reads as misaligned against the border.
+    flexShrink: 1,
+    alignItems: 'flex-end',
+  },
+  prize: {
+    textAlign: 'right',
   },
   linkRow: {
     flexDirection: 'row',
