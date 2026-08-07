@@ -15,8 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FollowButton } from '@/components/follow-button';
 import { FormField } from '@/components/form-field';
-import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
+import { MaxContentWidth, paidRing, Radii, Spacing, Typography } from '@/constants/theme';
 import { useOpenAngler } from '@/hooks/use-open-angler';
+import { fetchPaidMemberIds } from '@/lib/paidMembers';
 import { useTheme } from '@/hooks/use-theme';
 import { searchAnglers, type AnglerSearchResult } from '@/lib/anglerSearch';
 import { useAuth } from '@/providers/auth-provider';
@@ -30,7 +31,7 @@ const DEBOUNCE_MS = 300;
  * returns [] for anything shorter. */
 const MIN_QUERY_LENGTH = 2;
 
-function ResultRow({ angler }: { angler: AnglerSearchResult }) {
+function ResultRow({ angler, isPaidMember }: { angler: AnglerSearchResult; isPaidMember: boolean }) {
   const theme = useTheme();
   const openAngler = useOpenAngler();
 
@@ -49,10 +50,21 @@ function ResultRow({ angler }: { angler: AnglerSearchResult }) {
         accessibilityLabel={`View ${angler.displayName}'s profile`}
         style={styles.identity}>
         {angler.avatarUrl ? (
-          <Image source={{ uri: angler.avatarUrl }} style={[styles.avatar, { borderColor: theme.border }]} />
+          <Image
+            source={{ uri: angler.avatarUrl }}
+            style={[
+              styles.avatar,
+              { borderColor: theme.border },
+              isPaidMember && paidRing(SEARCH_AVATAR_SIZE, theme.gold),
+            ]}
+          />
         ) : (
           <View
-            style={[styles.avatar, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}
+            style={[
+              styles.avatar,
+              { backgroundColor: theme.surfaceElevated, borderColor: theme.border },
+              isPaidMember && paidRing(SEARCH_AVATAR_SIZE, theme.gold),
+            ]}
           />
         )}
 
@@ -93,6 +105,7 @@ export default function SearchAnglersScreen() {
   /** Distinguishes "nothing typed yet" from "searched and found nobody" —
    * without it the empty list reads as no matches before you've searched. */
   const [searched, setSearched] = useState(false);
+  const [paidIds, setPaidIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -111,6 +124,8 @@ export default function SearchAnglersScreen() {
         const found = await searchAnglers(trimmed);
         if (cancelled) return;
         setResults(found);
+        // One lookup per result set, not per row.
+        void fetchPaidMemberIds(found.map((x) => x.id)).then(setPaidIds);
         setError(null);
       } catch {
         if (cancelled) return;
@@ -173,7 +188,7 @@ export default function SearchAnglersScreen() {
         <FlatList
           data={results}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <ResultRow angler={item} />}
+          renderItem={({ item }) => <ResultRow angler={item} isPaidMember={paidIds.has(item.id)} />}
           keyboardShouldPersistTaps="handled"
           style={styles.list}
           contentContainerStyle={styles.listContent}
@@ -194,6 +209,8 @@ export default function SearchAnglersScreen() {
     </KeyboardAvoidingView>
   );
 }
+
+const SEARCH_AVATAR_SIZE = 44;
 
 const styles = StyleSheet.create({
   flex: {
@@ -232,8 +249,8 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
   },
   avatar: {
-    width: 44,
-    height: 44,
+    width: SEARCH_AVATAR_SIZE,
+    height: SEARCH_AVATAR_SIZE,
     borderRadius: Radii.circle,
     borderWidth: 1,
   },

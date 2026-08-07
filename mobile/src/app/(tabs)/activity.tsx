@@ -81,6 +81,10 @@ export default function ActivityScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState(false);
+  /* The watermark as it was when this visit began. Anything newer is
+   * unread *on this visit* — next time it will have moved past them, which
+   * is what marking read means. */
+  const [readBefore, setReadBefore] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,9 +100,12 @@ export default function ActivityScreen() {
           setError(true);
         }
       });
-    // Opening the tab is what "seen" means. Fire and forget: a failure here
-    // only means the badge shows once more.
-    void markActivityRead();
+    // Opening the tab is what "seen" means, so this runs immediately — and
+    // returns the watermark it replaced, which is the only way anything can
+    // still be shown as unread once it has.
+    void markActivityRead().then((previous) => {
+      if (!cancelled) setReadBefore(previous);
+    });
     return () => {
       cancelled = true;
     };
@@ -141,11 +148,18 @@ export default function ActivityScreen() {
   const renderRow = ({ item }: { item: ActivityEvent }) => {
     const { icon, colour } = presentation(item.kind, theme);
     const isPaid = item.actorId !== null && paidIds.has(item.actorId);
+    const unread = readBefore === null || item.occurredAt > readBefore;
 
     return (
       <Pressable
         onPress={() => openTarget(item)}
-        style={[styles.row, { borderColor: theme.border, backgroundColor: theme.surface }]}
+        style={[
+          styles.row,
+          {
+            borderColor: unread ? theme.primary : theme.border,
+            backgroundColor: unread ? theme.surfaceElevated : theme.surface,
+          },
+        ]}
         accessibilityRole="button">
         <View style={styles.avatarWrap}>
           {item.actorAvatarUrl ? (
@@ -186,6 +200,11 @@ export default function ActivityScreen() {
         </View>
 
         {item.photoUrl && <Image source={{ uri: item.photoUrl }} style={styles.thumb} />}
+
+        {/* A dot as well as the tint. Colour alone is not a distinction for
+          * anyone who cannot see this one, and the tint is deliberately
+          * subtle. */}
+        {unread && <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />}
       </Pressable>
     );
   };
@@ -289,6 +308,11 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     gap: Spacing.half,
+  },
+  unreadDot: {
+    width: Spacing.two,
+    height: Spacing.two,
+    borderRadius: Radii.circle,
   },
   thumb: {
     width: THUMB_SIZE,

@@ -78,10 +78,23 @@ export async function fetchUnreadActivityCount(): Promise<number> {
   return (data as number | null) ?? 0;
 }
 
-/** Called when the tab is opened. Failing to mark read is not worth telling
- * the angler about — the worst case is the badge shows again next time. */
-export async function markActivityRead(): Promise<void> {
-  await supabase.rpc('mark_activity_read');
+/**
+ * Marks everything up to now as seen, and returns the watermark it replaced.
+ *
+ * Opening the tab is what "seen" means, so this fires on mount — which is
+ * exactly why it has to hand back the old value. Without it nothing could
+ * ever render as unread: by the time the rows drew, the watermark had already
+ * moved past them.
+ *
+ * Null means they have never opened the tab, so everything is new.
+ *
+ * Failing is not worth telling the angler about — the worst case is that a
+ * few rows show as unread once more.
+ */
+export async function markActivityRead(): Promise<string | null> {
+  const { data, error } = await supabase.rpc('mark_activity_read');
+  if (error) return null;
+  return (data as string | null) ?? null;
 }
 
 /** How long ago, in the shortest form that is still unambiguous. */

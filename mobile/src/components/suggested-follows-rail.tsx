@@ -3,9 +3,17 @@ import { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { FollowButton } from '@/components/follow-button';
-import { MaxContentWidth, Radii, Spacing, SuggestedFollowsRailHeight, Typography } from '@/constants/theme';
+import {
+  MaxContentWidth,
+  paidRing,
+  Radii,
+  Spacing,
+  SuggestedFollowsRailHeight,
+  Typography,
+} from '@/constants/theme';
 import { useOpenAngler } from '@/hooks/use-open-angler';
 import { useTheme } from '@/hooks/use-theme';
+import { fetchPaidMemberIds } from '@/lib/paidMembers';
 import { dismissSuggestion, fetchSuggestedFollows, type SuggestedFollowCard } from '@/lib/suggestedFollows';
 import { ordinal } from '@/lib/units';
 
@@ -22,7 +30,15 @@ const GAP = Spacing.three;
  * circles, not bigger ones. */
 const MAX_CARD_WIDTH = 76;
 
-function Card({ card, onDismiss }: { card: SuggestedFollowCard; onDismiss: (id: string) => void }) {
+function Card({
+  card,
+  onDismiss,
+  isPaidMember,
+}: {
+  card: SuggestedFollowCard;
+  onDismiss: (id: string) => void;
+  isPaidMember: boolean;
+}) {
   const theme = useTheme();
   const openAngler = useOpenAngler();
   const accent =
@@ -31,10 +47,16 @@ function Card({ card, onDismiss }: { card: SuggestedFollowCard; onDismiss: (id: 
   return (
     <View style={styles.card}>
       {/* The avatar is the item now — no card chrome behind it, so the
-       * circles read as a row of faces rather than a row of tiles. The gold
-       * ring is what gives them an edge without card chrome: at this size a
-       * hairline in `border` all but vanishes against the background, and
-       * anglers with no avatar yet would be near-invisible discs. */}
+       * circles read as a row of faces rather than a row of tiles. They
+       * still need an edge: at this size a hairline in `border` all but
+       * vanishes, and anglers with no picture yet would be near-invisible
+       * discs.
+       *
+       * That edge used to be gold on everyone, which was fine when gold
+       * meant nothing. It now means paid member everywhere else in the
+       * app, so a decorative gold ring here was telling anglers that every
+       * suggestion was a paying one. Muted for everybody, gold only when
+       * it is earned. */}
       <View style={styles.avatarWrap}>
         {/* The dismiss button below stays a sibling of this one, not a child.
          * Nested Pressables both fire on web, so dismissing would open the
@@ -45,10 +67,21 @@ function Card({ card, onDismiss }: { card: SuggestedFollowCard; onDismiss: (id: 
           accessibilityLabel={`View ${card.username}'s profile`}
           style={styles.avatarLink}>
           {card.avatarUrl ? (
-            <Image source={{ uri: card.avatarUrl }} style={[styles.avatar, { borderColor: theme.gold }]} />
+            <Image
+              source={{ uri: card.avatarUrl }}
+              style={[
+                styles.avatar,
+                { borderColor: theme.textMuted },
+                isPaidMember && paidRing(RAIL_AVATAR_SIZE, theme.gold),
+              ]}
+            />
           ) : (
             <View
-              style={[styles.avatar, { backgroundColor: theme.surfaceElevated, borderColor: theme.gold }]}
+              style={[
+                styles.avatar,
+                { backgroundColor: theme.surfaceElevated, borderColor: theme.textMuted },
+                isPaidMember && paidRing(RAIL_AVATAR_SIZE, theme.gold),
+              ]}
             />
           )}
         </Pressable>
@@ -79,14 +112,22 @@ function Card({ card, onDismiss }: { card: SuggestedFollowCard; onDismiss: (id: 
   );
 }
 
+/** The drawn diameter of a rail avatar, so the gold ring can scale to it.
+ * The avatar fills its wrapper, which is capped at MAX_CARD_WIDTH. */
+const RAIL_AVATAR_SIZE = 76;
+
 export function SuggestedFollowsRail() {
   const theme = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const [cards, setCards] = useState<SuggestedFollowCard[] | null>(null);
+  const [paidIds, setPaidIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchSuggestedFollows()
-      .then(setCards)
+      .then((found) => {
+        setCards(found);
+        void fetchPaidMemberIds(found.map((c) => c.id)).then(setPaidIds);
+      })
       .catch(() => setCards([]));
   }, []);
 
@@ -117,7 +158,7 @@ export function SuggestedFollowsRail() {
         style={{ height: SuggestedFollowsRailHeight }}>
         {cards.map((card) => (
           <View key={card.id} style={{ width: cardWidth }}>
-            <Card card={card} onDismiss={handleDismiss} />
+            <Card card={card} onDismiss={handleDismiss} isPaidMember={paidIds.has(card.id)} />
           </View>
         ))}
       </ScrollView>

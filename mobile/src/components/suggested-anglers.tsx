@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Radii, Spacing, Typography } from '@/constants/theme';
+import { paidRing, Radii, Spacing, Typography } from '@/constants/theme';
 import { useOpenAngler } from '@/hooks/use-open-angler';
+import { fetchPaidMemberIds } from '@/lib/paidMembers';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchSuggestedAnglers, followAngler, type SuggestedAngler } from '@/lib/follows';
 
@@ -17,11 +18,17 @@ export function SuggestedAnglersList({ onFollowed }: SuggestedAnglersListProps) 
   const openAngler = useOpenAngler();
   const [anglers, setAnglers] = useState<SuggestedAngler[] | null>(null);
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
+  const [paidIds, setPaidIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
     fetchSuggestedAnglers().then((data) => {
-      if (!cancelled) setAnglers(data);
+      if (cancelled) return;
+      setAnglers(data);
+      // Gold rings, resolved for the whole list in one query.
+      void fetchPaidMemberIds(data.map((x) => x.id)).then((ids) => {
+        if (!cancelled) setPaidIds(ids);
+      });
     });
     return () => {
       cancelled = true;
@@ -69,9 +76,18 @@ export function SuggestedAnglersList({ onFollowed }: SuggestedAnglersListProps) 
               accessibilityLabel={`View ${angler.displayName}'s profile`}
               style={styles.identity}>
               {angler.avatarUrl ? (
-                <Image source={{ uri: angler.avatarUrl }} style={styles.avatar} />
+                <Image
+                  source={{ uri: angler.avatarUrl }}
+                  style={[styles.avatar, paidIds.has(angler.id) && paidRing(SUGGESTED_AVATAR_SIZE, theme.gold)]}
+                />
               ) : (
-                <View style={[styles.avatar, { backgroundColor: theme.surfaceElevated }]} />
+                <View
+                  style={[
+                    styles.avatar,
+                    { backgroundColor: theme.surfaceElevated },
+                    paidIds.has(angler.id) && paidRing(SUGGESTED_AVATAR_SIZE, theme.gold),
+                  ]}
+                />
               )}
               <View style={styles.info}>
                 <Text style={[Typography.h3, { color: theme.text }]} numberOfLines={1}>
@@ -102,6 +118,8 @@ export function SuggestedAnglersList({ onFollowed }: SuggestedAnglersListProps) 
   );
 }
 
+const SUGGESTED_AVATAR_SIZE = 40;
+
 const styles = StyleSheet.create({
   loading: {
     marginTop: Spacing.four,
@@ -120,8 +138,8 @@ const styles = StyleSheet.create({
     borderRadius: Radii.sm,
   },
   avatar: {
-    width: 40,
-    height: 40,
+    width: SUGGESTED_AVATAR_SIZE,
+    height: SUGGESTED_AVATAR_SIZE,
     borderRadius: Radii.circle,
   },
   /** Takes the row's slack, so the Follow button stays hard right and the

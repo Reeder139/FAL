@@ -5,8 +5,9 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 
 import { FollowButton } from '@/components/follow-button';
 import { TabScreen } from '@/components/tab-screen';
-import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
+import { MaxContentWidth, paidRing, Radii, Spacing, Typography } from '@/constants/theme';
 import { useOpenAngler } from '@/hooks/use-open-angler';
+import { fetchPaidMemberIds } from '@/lib/paidMembers';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchFollowingIds, fetchFollowList, type FollowListEntry, type FollowListKind } from '@/lib/follows';
 import { useAuth } from '@/providers/auth-provider';
@@ -24,6 +25,7 @@ export default function ConnectionsScreen() {
   const { id, kind } = useLocalSearchParams<{ id: string; kind: FollowListKind }>();
   const [entries, setEntries] = useState<FollowListEntry[] | null>(null);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [paidIds, setPaidIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!id || !kind) return;
@@ -32,6 +34,10 @@ export default function ConnectionsScreen() {
       if (cancelled) return;
       setEntries(list);
       setFollowingIds(mine);
+      // Gold rings, one query for the whole list.
+      void fetchPaidMemberIds(list.map((e) => e.id)).then((ids) => {
+        if (!cancelled) setPaidIds(ids);
+      });
     });
     return () => {
       cancelled = true;
@@ -66,9 +72,18 @@ export default function ConnectionsScreen() {
                 onPress={() => openAngler(angler.id)}
                 style={[styles.row, { borderColor: theme.border }]}>
                 {angler.avatarUrl ? (
-                  <Image source={{ uri: angler.avatarUrl }} style={styles.avatar} />
+                  <Image
+                    source={{ uri: angler.avatarUrl }}
+                    style={[styles.avatar, paidIds.has(angler.id) && paidRing(CONNECTION_AVATAR_SIZE, theme.gold)]}
+                  />
                 ) : (
-                  <View style={[styles.avatar, { backgroundColor: theme.surfaceElevated }]} />
+                  <View
+                    style={[
+                      styles.avatar,
+                      { backgroundColor: theme.surfaceElevated },
+                      paidIds.has(angler.id) && paidRing(CONNECTION_AVATAR_SIZE, theme.gold),
+                    ]}
+                  />
                 )}
                 <View style={styles.info}>
                   <Text style={[Typography.h3, { color: theme.text }]} numberOfLines={1}>
@@ -89,6 +104,8 @@ export default function ConnectionsScreen() {
     </TabScreen>
   );
 }
+
+const CONNECTION_AVATAR_SIZE = 40;
 
 const styles = StyleSheet.create({
   content: {
@@ -134,8 +151,8 @@ const styles = StyleSheet.create({
     borderRadius: Radii.sm,
   },
   avatar: {
-    width: 40,
-    height: 40,
+    width: CONNECTION_AVATAR_SIZE,
+    height: CONNECTION_AVATAR_SIZE,
     borderRadius: Radii.circle,
   },
   info: {
