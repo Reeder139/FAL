@@ -12,7 +12,7 @@ import {
 
 import { LeagueTable } from '@/components/league-table';
 import { TabScreen } from '@/components/tab-screen';
-import { MaxContentWidth, NavIconSize, Radii, Spacing, Typography } from '@/constants/theme';
+import { FontWeight, MaxContentWidth, NavIconSize, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchNationalStandings, type NationalStandings } from '@/lib/divisions';
 
@@ -136,11 +136,18 @@ export default function NationalLeagueScreen() {
           </View>
           {/* The counterpart to the divisional tables' gold line. Primary
             * rather than gold on purpose: gold means paid membership
-            * throughout the app, and this is the league that doesn't need
-            * it. At caption size it holds one line on a 360px phone. */}
-          <Text style={[Typography.caption, { color: theme.primary }]}>
-            All players&rsquo; best fish count in this league
-          </Text>
+            * throughout the app, and this is the league that doesn't need it.
+            *
+            * The number comes from the season, never from a constant here:
+            * counting_fish is 5 in summer and 3 in winter, and is a per-season
+            * tunable besides. Hardcoding "5" would quietly start lying in
+            * October. Rendered only once the season is known, so it cannot
+            * flash the wrong figure while loading. */}
+          {standings && (
+            <Text style={[Typography.caption, styles.countingRule, { color: theme.primary }]}>
+              Every player&rsquo;s best {standings.countingFish} fish count in this league
+            </Text>
+          )}
         </View>
 
         {loading ? (
@@ -195,6 +202,12 @@ const styles = StyleSheet.create({
   header: {
     paddingVertical: Spacing.one,
     gap: Spacing.half,
+  },
+  countingRule: {
+    // Centred across the header rather than sitting under the title's left
+    // edge: it is a rule about the whole league, not a subtitle to the name.
+    textAlign: 'center',
+    fontWeight: FontWeight.bold,
   },
   titleRow: {
     flexDirection: 'row',

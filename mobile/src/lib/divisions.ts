@@ -439,6 +439,10 @@ export interface NationalStandingRow extends StandingRow {
 
 export interface NationalStandings {
   seasonName: string;
+  /** How many of an angler's fish count towards this season — 5 in summer,
+   * 3 in winter. A per-season tunable, so the page states the number rather
+   * than hardcoding one that goes wrong every October. */
+  countingFish: number;
   /** Everyone with an active entry in the season, whether or not they've
    * scored yet — so it can read "of 21" while the table lists fewer. */
   memberCount: number;
@@ -483,7 +487,11 @@ export async function fetchNationalStandings(): Promise<NationalStandings | null
     supabase.from('divisions').select('id, name, rank').eq('season_id', season.id),
   ]);
 
-  const base = { seasonName: season.name, memberCount: memberCount ?? 0 };
+  const base = {
+    seasonName: season.name,
+    countingFish: season.counting_fish,
+    memberCount: memberCount ?? 0,
+  };
   if (!tableRows || tableRows.length === 0) return { ...base, rows: [] };
 
   const anglerIds = tableRows.map((r) => r.angler_id);
