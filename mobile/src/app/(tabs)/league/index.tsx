@@ -178,7 +178,7 @@ export default function NationalLeagueScreen() {
               <View style={[styles.infoStat, styles.infoStatWide]}>
                 <Text style={[Typography.label, { color: theme.label }]}>Playing for</Text>
                 <Text style={[Typography.body, styles.prize, { color: theme.text }]} numberOfLines={2}>
-                  National Champ Bragging Rights, Top 10 Tackle Bundles
+                  National Champ Bragging Rights Top 10 Tackle Bundles
                 </Text>
               </View>
             </View>
