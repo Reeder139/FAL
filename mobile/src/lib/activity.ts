@@ -16,7 +16,10 @@ export type ActivityKind =
   | 'catch_under_review'
   | 'catch_pending'
   | 'position_moved_up'
-  | 'position_overtaken';
+  | 'position_overtaken'
+  | 'witness_request'
+  | 'witness_confirmed'
+  | 'witness_declined';
 
 /**
  * A league move, unpacked from the `body` of a `position_*` event.

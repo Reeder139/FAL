@@ -19,6 +19,7 @@ import { FormField } from '@/components/form-field';
 import { PhotoRoleStrip, type PhotoStripItem } from '@/components/photo-role-strip';
 import { VenuePicker, type VenueSelection } from '@/components/venue-picker';
 import { VisibilityPicker } from '@/components/visibility-picker';
+import { WitnessPicker, type WitnessSelection } from '@/components/witness-picker';
 import { MaxContentWidth, Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -45,6 +46,7 @@ import {
 } from '@/lib/dateInput';
 import { computePoints, fetchSeasonForDate, type SeasonLookup } from '@/lib/scoring';
 import { DuplicateImageError, submitCatch, type PostVisibility, type SubmitCatchResult } from '@/lib/submitCatch';
+import { nominateWitness } from '@/lib/witness';
 import { toWeightOz } from '@/lib/units';
 import { generateUuidV4 } from '@/lib/uuid';
 import { useAuth } from '@/providers/auth-provider';
@@ -72,6 +74,8 @@ export default function LogCatchScreen() {
   const [venue, setVenue] = useState<VenueSelection | null>(null);
   const [venueHidden, setVenueHidden] = useState(false);
   const [visibility, setVisibility] = useState<PostVisibility>('public');
+  const [witness, setWitness] = useState<WitnessSelection | null>(null);
+  const [witnessError, setWitnessError] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
   // null while the first lookup is in flight.
   const [seasonLookup, setSeasonLookup] = useState<SeasonLookup | null>(null);
@@ -254,6 +258,24 @@ export default function LogCatchScreen() {
       });
       setResult(submitResult);
 
+      /* Nominated after the fact rather than inside submit_catch, because a
+       * witness is optional and the catch is not: a failure here must not
+       * take the catch down with it. Reported separately for the same
+       * reason — the fish is logged either way, and saying so beats a
+       * generic failure that makes the angler wonder whether to submit
+       * again. */
+      if (submitResult.catchId && witness) {
+        try {
+          await nominateWitness(submitResult.catchId, witness.id);
+        } catch (e) {
+          setWitnessError(
+            e instanceof Error
+              ? `Catch logged, but ${witness.username} could not be nominated: ${e.message}`
+              : `Catch logged, but ${witness.username} could not be nominated.`
+          );
+        }
+      }
+
       if (submitResult.catchId) {
         setLoadingResult(true);
         fetchCatchResult(submitResult.catchId)
@@ -317,6 +339,20 @@ export default function LogCatchScreen() {
             <Text style={[Typography.h1, { color: theme.text, textAlign: 'center' }]}>
               {result.catchId ? 'Catch logged!' : 'Posted!'}
             </Text>
+
+            {/* The catch landed; only the nomination did not. Said plainly so
+              * the angler does not resubmit a fish that is already logged. */}
+            {witnessError && (
+              <Text style={[Typography.bodySmall, { color: theme.danger, textAlign: 'center' }]}>
+                {witnessError}
+              </Text>
+            )}
+
+            {witness && !witnessError && (
+              <Text style={[Typography.bodySmall, { color: theme.textSecondary, textAlign: 'center' }]}>
+                {witness.username} has been asked to confirm they witnessed this catch.
+              </Text>
+            )}
 
             {result.catchId && result.status === 'under_review' && (
               <Text style={[Typography.bodySmall, { color: theme.textSecondary, textAlign: 'center' }]}>
@@ -478,6 +514,8 @@ export default function LogCatchScreen() {
             venueHidden={venueHidden}
             onChangeVenueHidden={setVenueHidden}
           />
+
+          <WitnessPicker selection={witness} onChange={setWitness} />
 
           <FormField
             label="Caption"

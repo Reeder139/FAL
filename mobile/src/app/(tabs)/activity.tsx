@@ -17,6 +17,7 @@ import {
 } from '@/lib/activity';
 import { fetchPaidMemberIds } from '@/lib/paidMembers';
 import { formatWeightOz, ordinal } from '@/lib/units';
+import { respondToWitnessRequest } from '@/lib/witness';
 
 const AVATAR_SIZE = 40;
 const THUMB_SIZE = 40;
@@ -46,6 +47,12 @@ function presentation(kind: string, theme: ReturnType<typeof useTheme>) {
       return { icon: 'trending-up' as const, colour: theme.success };
     case 'position_overtaken':
       return { icon: 'trending-down' as const, colour: theme.danger };
+    case 'witness_request':
+      return { icon: 'shield-outline' as const, colour: theme.gold };
+    case 'witness_confirmed':
+      return { icon: 'shield-checkmark' as const, colour: theme.success };
+    case 'witness_declined':
+      return { icon: 'shield-outline' as const, colour: theme.danger };
     default:
       return { icon: 'notifications' as const, colour: theme.textMuted };
   }
@@ -73,6 +80,12 @@ function describe(event: ActivityEvent): string {
       return `Your catch${weight} was rejected`;
     case 'catch_under_review':
       return `Your catch${weight} is under review`;
+    case 'witness_request':
+      return `${who} asked you to witness their catch${weight}`;
+    case 'witness_confirmed':
+      return `${who} confirmed they witnessed your catch${weight}`;
+    case 'witness_declined':
+      return `${who} could not confirm your catch${weight}`;
     case 'position_moved_up':
     case 'position_overtaken': {
       const move = parsePositionMove(event.body);
@@ -107,6 +120,20 @@ export default function ActivityScreen() {
    * unread *on this visit* — next time it will have moved past them, which
    * is what marking read means. */
   const [readBefore, setReadBefore] = useState<string | null>(null);
+  /* Answered witness requests, by catch id. The feed only carries pending
+   * ones, so once answered the row has to stop offering the buttons without
+   * waiting for a refetch — and has to say which way it went, because the
+   * angler has just made a statement of fact and should see it land. */
+  const [answered, setAnswered] = useState<Record<string, 'confirmed' | 'declined' | 'failed'>>({});
+
+  const answerWitness = async (catchId: string, confirmed: boolean) => {
+    try {
+      await respondToWitnessRequest(catchId, confirmed);
+      setAnswered((prev) => ({ ...prev, [catchId]: confirmed ? 'confirmed' : 'declined' }));
+    } catch {
+      setAnswered((prev) => ({ ...prev, [catchId]: 'failed' }));
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -219,6 +246,58 @@ export default function ActivityScreen() {
           <Text style={[Typography.bodySmall, { color: theme.text }]} numberOfLines={2}>
             {describe(item)}
           </Text>
+
+          {/* The whole point of the notification: the witness answers here
+            * rather than being sent somewhere to do it. Siblings of the row's
+            * Pressable would be cleaner, but these sit inside it, so each
+            * stops the press from also opening the post underneath. */}
+          {item.kind === 'witness_request' && item.catchId && (
+            <View style={styles.witnessActions}>
+              {answered[item.catchId] === undefined ? (
+                <>
+                  <Pressable
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      void answerWitness(item.catchId!, true);
+                    }}
+                    accessibilityRole="button"
+                    style={[styles.witnessButton, { backgroundColor: theme.gold }]}>
+                    <Text style={[Typography.caption, { color: theme.background }]}>
+                      I witnessed this
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      void answerWitness(item.catchId!, false);
+                    }}
+                    accessibilityRole="button"
+                    style={[styles.witnessButton, styles.witnessDecline, { borderColor: theme.border }]}>
+                    <Text style={[Typography.caption, { color: theme.textSecondary }]}>I didn&rsquo;t</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <Text
+                  style={[
+                    Typography.caption,
+                    {
+                      color:
+                        answered[item.catchId] === 'confirmed'
+                          ? theme.success
+                          : answered[item.catchId] === 'declined'
+                            ? theme.textMuted
+                            : theme.danger,
+                    },
+                  ]}>
+                  {answered[item.catchId] === 'confirmed'
+                    ? 'You confirmed this catch'
+                    : answered[item.catchId] === 'declined'
+                      ? 'You said you did not witness this'
+                      : 'Could not send your answer — try again shortly'}
+                </Text>
+              )}
+            </View>
+          )}
           {item.body && (
             <Text style={[Typography.caption, { color: theme.textSecondary }]} numberOfLines={2}>
               {item.body}
@@ -336,6 +415,20 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     gap: Spacing.half,
+  },
+  witnessActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingTop: Spacing.half,
+  },
+  witnessButton: {
+    borderRadius: Radii.pill,
+    paddingVertical: Spacing.half,
+    paddingHorizontal: Spacing.three,
+  },
+  witnessDecline: {
+    borderWidth: 1,
   },
   unreadDot: {
     width: Spacing.two,

@@ -194,6 +194,19 @@ export default function CountingFishScreen() {
                       <Text style={[Typography.caption, { color: theme.primary }]}>
                         {fish.points.toFixed(1)} pts
                       </Text>
+
+                      {/* Only a confirmed statement is a badge. A pending one
+                        * says nothing yet, and a decline is for a reviewer to
+                        * weigh rather than a scarlet letter shown to the whole
+                        * membership — it is on the record either way. */}
+                      {fish.witness?.status === 'confirmed' && (
+                        <View style={styles.witnessLine}>
+                          <Ionicons name="shield-checkmark" size={13} color={theme.success} />
+                          <Text style={[Typography.caption, { color: theme.success }]} numberOfLines={1}>
+                            Witnessed by {fish.witness.witnessUsername}
+                          </Text>
+                        </View>
+                      )}
                     </View>
 
                     {openable && <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />}
@@ -303,6 +316,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: Radii.pill,
     paddingHorizontal: Spacing.two,
+  },
+  witnessLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
   },
   footnote: {
     textAlign: 'center',

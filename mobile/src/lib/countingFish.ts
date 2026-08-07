@@ -1,5 +1,6 @@
 import { getPublicStorageUrl } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
+import { fetchWitnessStatements, type WitnessStatement } from '@/lib/witness';
 
 /** Which competition's counting fish to fetch. The two genuinely differ: a
  * divisional table counts only fish caught inside a paid stint, so the same
@@ -18,6 +19,10 @@ export interface CountingFish {
   rank: number;
   isPb: boolean;
   fishName: string | null;
+  /** Who vouched for this fish, if anyone was asked. Null when no witness was
+   * nominated — which is not a mark against the catch, only the absence of a
+   * mark for it. */
+  witness: WitnessStatement | null;
 }
 
 export interface CountingFishPage {
@@ -100,6 +105,7 @@ export async function fetchCountingFish(
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
   ]);
 
+  const witnesses = await fetchWitnessStatements(catchIds);
   const catchById = new Map((catches ?? []).map((c) => [c.id as string, c]));
   const pathByPost = new Map((media ?? []).map((m) => [m.post_id, m.storage_path]));
   const venueById = new Map((venues ?? []).map((v) => [v.id, v.name]));
@@ -120,6 +126,7 @@ export async function fetchCountingFish(
         rank: s.rank_in_season as number,
         isPb: Boolean(c?.is_pb),
         fishName: (c?.fish_name as string | null) ?? null,
+        witness: witnesses.get(s.catch_id as string) ?? null,
       };
     }),
   };
