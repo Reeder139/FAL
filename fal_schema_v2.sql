@@ -618,34 +618,107 @@ join seasons s on s.id = sc.season_id
 where sc.rank_in_season <= s.counting_fish
 group by sc.season_id, sc.division_id, sc.angler_id, s.counting_fish;
 
+-- Every verified catch, scored against whichever season its date falls in.
+--
+-- No season_entries join — that is the entire point of this view existing
+-- alongside scored_catches. Membership decides prize eligibility; it does not
+-- decide whether a fish was caught. Without this, free members (who have no
+-- season_entries row at all until they pay) were absent from the national
+-- standing entirely.
+--
+-- Ranks by the *final* points, including the PB and named-fish multipliers,
+-- where scored_catches ranks by the bare fal_points() and multiplies after.
+-- This matches hypothetical_season_total, which is what the league-position
+-- strip already shows a free member, so the strip and the table agree.
+create or replace view national_scored_catches
+with (security_invoker = on) as
+with scored as (
+  select
+    c.id        as catch_id,
+    c.angler_id,
+    s.id        as season_id,
+    c.weight_oz,
+    c.caught_at,
+    fal_points(c.weight_oz, s.scoring_multiplier, s.scoring_offset_oz,
+               s.scoring_exponent, s.min_qualifying_oz)
+      * case when c.is_pb then s.pb_bonus_multiplier else 1 end
+      * case when c.fish_name is not null then s.named_fish_multiplier else 1 end
+                as points
+  from catches c
+  join seasons s on c.caught_at::date between s.starts_on and s.ends_on
+  where c.status = 'verified'
+)
+select
+  catch_id,
+  angler_id,
+  season_id,
+  weight_oz,
+  caught_at,
+  points,
+  row_number() over (
+    partition by angler_id, season_id
+    order by points desc, caught_at asc
+  ) as rank_in_season
+from scored;
+
 -- The "National League": one standing across every division in a
 -- season. Bragging rights only — no prize money attaches to it, unlike the
 -- divisional tables.
 --
 -- Can't just read league_table: that view's `position` is rank()
 -- partitioned by division, i.e. a per-division placing. Ranking nationally
--- means re-ranking over the whole season, so this aggregates from
--- scored_catches the same way and only changes the partition.
+-- means re-ranking over the whole season.
 --
--- Deliberately NOT filtered by season_entries.tier — it includes everyone
--- with an active entry, which is what the divisional tables already do.
+-- Contains every angler with a qualifying fish this season, paid or free —
+-- which is what "All players' best fish count in this league" on the page
+-- means. That is why it reads national_scored_catches and not scored_catches.
 create or replace view national_league_table
 with (security_invoker = on) as
+with counting as (
+  select sc.season_id, sc.angler_id, sc.points, sc.weight_oz
+  from national_scored_catches sc
+  join seasons s on s.id = sc.season_id
+  where sc.rank_in_season <= s.counting_fish
+),
+totals as (
+  select
+    c.season_id,
+    c.angler_id,
+    sum(c.points)    as total_points,
+    count(*)         as counting_fish,
+    max(c.weight_oz) as best_fish_oz
+  from counting c
+  group by c.season_id, c.angler_id
+)
 select
-  sc.season_id,
-  sc.angler_id,
-  sc.division_id,
-  sum(sc.points)    as total_points,
-  count(*)          as counting_fish,
-  max(sc.weight_oz) as best_fish_oz,
+  t.season_id,
+  t.angler_id,
+  -- Their real division if they have an entry, otherwise the one their
+  -- declared PB would put them in. Only ever a "Div N" badge on a national
+  -- row — the national standing itself is not divided. Still null when no
+  -- division covers their PB, which is why league_table_with_ghost
+  -- left-joins divisions.
+  coalesce(
+    (
+      select se.division_id
+      from season_entries se
+      where se.angler_id = t.angler_id
+        and se.season_id = t.season_id
+        and se.left_at is null
+      order by se.joined_at desc
+      limit 1
+    ),
+    (public.division_for_pb(t.season_id, p.declared_pb_oz)).id
+  ) as division_id,
+  t.total_points,
+  t.counting_fish,
+  t.best_fish_oz,
   rank() over (
-    partition by sc.season_id
-    order by sum(sc.points) desc
-  )                 as position
-from scored_catches sc
-join seasons s on s.id = sc.season_id
-where sc.rank_in_season <= s.counting_fish
-group by sc.season_id, sc.angler_id, sc.division_id, s.counting_fish;
+    partition by t.season_id
+    order by t.total_points desc
+  ) as position
+from totals t
+join profiles p on p.id = t.angler_id;
 
 
 -- ============================================================================
@@ -1516,7 +1589,6 @@ declare
   v_ghost_div     divisions%rowtype;
   v_has_entry     boolean := false;
   v_ghost_points  numeric;
-  v_ghost_pos     integer;
   v_ghost_best    integer;
   v_ghost_count   integer;
 begin
@@ -1599,7 +1671,13 @@ begin
     join profiles p on p.id = m.angler_id
     join divisions d on d.id = m.division_id;
   else
-    -- National mode, unchanged: everyone is in this standing on equal terms.
+    -- National mode. Every angler with a qualifying fish this season is in
+    -- national_league_table, paid or free, so there is no ghost to append and
+    -- no row is greyed out: is_ghost is false for all of them.
+    --
+    -- Left join, because division_id is null for an angler whose declared PB
+    -- matches no division. An inner join drops exactly the anglers the
+    -- national table exists to include.
     return query
     select
       n.angler_id,
@@ -1617,12 +1695,17 @@ begin
       n.angler_id = v_caller
     from national_league_table n
     join profiles p on p.id = n.angler_id
-    join divisions d on d.id = n.division_id
+    left join divisions d on d.id = n.division_id
     where n.season_id = v_season.id;
+
+    -- Nothing further to add nationally.
+    return;
   end if;
 
-  -- Below here: the ghost for anglers with no season_entries row at all.
-  -- They never reach league_table, so their score is reconstructed.
+  -- Below here: the divisional ghost, for an angler with no season_entries
+  -- row at all. They never reach league_table, so their score is
+  -- reconstructed. This is the cash-prize table, so the row is deliberately
+  -- unnumbered and carries the Join call to action.
   if v_caller is null then
     return;
   end if;
@@ -1646,9 +1729,9 @@ begin
   if v_ghost_div.id is null then
     return;
   end if;
-  -- On a division page, only surface the ghost on the caller's own
-  -- division — they aren't racing the others.
-  if p_division_id is not null and p_division_id <> v_ghost_div.id then
+  -- Only surface the ghost on the caller's own division — they aren't racing
+  -- the others.
+  if p_division_id <> v_ghost_div.id then
     return;
   end if;
 
@@ -1661,19 +1744,9 @@ begin
     and c.status = 'verified'
     and c.caught_at::date between v_season.starts_on and v_season.ends_on;
 
-  -- In a division the ghost is unnumbered like any other unpaid row. In the
-  -- national table it keeps a real position, since that standing includes
-  -- everyone.
-  if p_division_id is not null then
-    v_ghost_pos := null;
-  else
-    select count(*)::integer + 1
-    into v_ghost_pos
-    from national_league_table n
-    where n.season_id = v_season.id
-      and n.total_points > v_ghost_points;
-  end if;
-
+  -- Unnumbered, like any other unpaid row in a division: a place in a
+  -- cash-prize table always belongs to someone who can win it. Only reached
+  -- in division mode now — the national branch returns above.
   return query
   select
     v_caller,
@@ -1686,7 +1759,7 @@ begin
     v_ghost_points,
     coalesce(v_ghost_count, 0),
     v_ghost_best,
-    v_ghost_pos,
+    null::integer,
     true,
     true;
 end;

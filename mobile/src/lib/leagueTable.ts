@@ -6,9 +6,12 @@ export interface LeagueTableRow {
   username: string;
   displayName: string;
   avatarUrl: string | null;
-  divisionId: string;
-  divisionName: string;
-  divisionRank: number;
+  /** Null when no division covers the angler's declared PB. Only the "Div N"
+   * badge depends on these, and the national standing isn't divided, so the
+   * row still belongs in the table without them. */
+  divisionId: string | null;
+  divisionName: string | null;
+  divisionRank: number | null;
   points: number;
   countingFish: number;
   bestFishOz: number | null;
@@ -33,9 +36,9 @@ interface RawRow {
   username: string;
   display_name: string;
   avatar_path: string | null;
-  division_id: string;
-  division_name: string;
-  division_rank: number;
+  division_id: string | null;
+  division_name: string | null;
+  division_rank: number | null;
   total_points: number;
   counting_fish: number;
   best_fish_oz: number | null;
@@ -148,19 +151,25 @@ async function attachCountingFishPhotos(
   // the tunables that re-scores every leaderboard when it changes.
   const { data: season } = await supabase
     .from('seasons')
-    .select('counting_fish')
+    .select('id, counting_fish')
     .eq('status', 'running')
     .maybeSingle();
   const cap = season?.counting_fish;
-  if (!cap) return;
+  if (!season || !cap) return;
 
   const anglerIds = [...new Set(rows.map((r) => r.anglerId))];
   const scored = await selectIn<{ catch_id: string; angler_id: string; rank_in_season: number }>(
-    divisionScope ? 'division_scored_catches' : 'scored_catches',
+    // national_scored_catches, not scored_catches: the latter inner-joins
+    // season_entries, so a free member has no rows in it and their national
+    // row came back with an empty fish strip.
+    divisionScope ? 'division_scored_catches' : 'national_scored_catches',
     'catch_id, angler_id, rank_in_season',
     'angler_id',
     anglerIds,
-    (q) => q.lte('rank_in_season', cap)
+    // rank_in_season is numbered per angler *per season*, so without pinning
+    // the season a past season's top five matches `rank <= cap` just as well
+    // as this one's and its photos end up on the strip.
+    (q) => q.eq('season_id', season.id).lte('rank_in_season', cap)
   );
   if (scored.length === 0) return;
 

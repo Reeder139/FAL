@@ -64,7 +64,10 @@ type RowProps = {
 function TableRow({ row, showDivisionBadge, onJoin, isPaidMember }: RowProps) {
   const theme = useTheme();
   const openAngler = useOpenAngler();
-  const divisionColor = theme[DIVISION_COLOR_KEYS[(row.divisionRank - 1) % 3]];
+  // Falls back to primary when the angler sits in no division — the badge is
+  // hidden in that case anyway, but the colour is read before that is known.
+  const divisionColor =
+    row.divisionRank !== null ? theme[DIVISION_COLOR_KEYS[(row.divisionRank - 1) % 3]] : theme.primary;
   const hasScored = row.countingFish > 0;
   const openProfile = () => openAngler(row.anglerId);
 
@@ -151,7 +154,7 @@ function TableRow({ row, showDivisionBadge, onJoin, isPaidMember }: RowProps) {
         </View>
 
         <View style={styles.rowMetaLine}>
-          {showDivisionBadge && !row.isGhost && (
+          {showDivisionBadge && !row.isGhost && row.divisionRank !== null && (
             <View style={[styles.divisionPill, { borderColor: divisionColor }]}>
               <Text style={[Typography.caption, { color: divisionColor }]}>Div {row.divisionRank}</Text>
             </View>
