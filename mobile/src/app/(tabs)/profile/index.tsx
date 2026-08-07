@@ -87,6 +87,32 @@ export default function ProfileScreen() {
   return (
     <TabScreen>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* First thing on the page, directly under the League Position strip
+          * and the strapline that TabScreen draws above every tab. The only
+          * invitation to join left in the app — the banner that used to ride
+          * that strip on every screen is gone — so it sits where it cannot be
+          * scrolled past, and stays until they join.
+          *
+          * Outside the `profile &&` guard below so it does not wait on the
+          * profile fetch. It needs no profile of its own: isPaidMember is null
+          * until its own lookup answers, and null renders nothing.
+          *
+          * `=== false` and not `!isPaidMember`: null means "not known yet",
+          * and treating that as "free" would flash the upsell at a paying
+          * member every time they opened the tab. */}
+        {isPaidMember === false && (
+          <Pressable
+            onPress={() => router.push('/join')}
+            accessibilityRole="button"
+            hitSlop={Spacing.two}
+            style={({ pressed }) => [styles.joinPrompt, pressed && styles.joinPromptPressed]}>
+            <Text style={[Typography.body, styles.joinPromptText, { color: theme.gold }]}>
+              Join now to play in the Big Leagues for the £20,000 grand prize plus other prizes and
+              benefits
+            </Text>
+          </Pressable>
+        )}
+
         {/* Top-right rather than below the content: at the bottom it sat
          * under the tab bar once the catch grid pushed the page past the
          * viewport. */}
@@ -130,28 +156,6 @@ export default function ProfileScreen() {
               <Text style={[Typography.bodySmall, styles.avatarError, { color: theme.danger }]}>
                 {avatarError}
               </Text>
-            )}
-
-            {/* The invitation to join, and the only one left — the banner
-              * that used to ride the League Position strip on every tab is
-              * gone. High on the profile because this is the screen that is
-              * about you rather than about the competition, and it stays put
-              * until they join rather than being dismissible.
-              *
-              * `=== false` and not `!isPaidMember`: null means the lookup has
-              * not answered yet, and treating that as "free" would flash this
-              * at a paying member every time they opened the tab. */}
-            {isPaidMember === false && (
-              <Pressable
-                onPress={() => router.push('/join')}
-                accessibilityRole="button"
-                hitSlop={Spacing.two}
-                style={({ pressed }) => [styles.joinPrompt, pressed && styles.joinPromptPressed]}>
-                <Text style={[Typography.body, styles.joinPromptText, { color: theme.gold }]}>
-                  Join now to play in the Big Leagues for the £20,000 grand prize plus other prizes
-                  and benefits
-                </Text>
-              </Pressable>
             )}
 
             {/* Directly under the PB box: starting a league is the one thing
@@ -210,7 +214,12 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.three,
   },
   joinPrompt: {
-    marginBottom: Spacing.three,
+    // The content column centres its children, which would leave this sized
+    // to its own text and wrapping at whatever width that happened to be.
+    // Stretching it makes the wrap predictable and gives textAlign: 'center'
+    // the full column to centre within. Spacing below comes from the
+    // column's own gap, like every other child.
+    alignSelf: 'stretch',
     paddingHorizontal: Spacing.one,
   },
   joinPromptPressed: {
