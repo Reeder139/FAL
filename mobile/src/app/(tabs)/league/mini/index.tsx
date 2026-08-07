@@ -107,8 +107,11 @@ export default function MiniLeaguesScreen() {
         <ActivityIndicator color={theme.primary} style={styles.loading} />
       ) : leagues.length === 0 ? (
         <View style={styles.emptyState}>
+          {/* The answer the pill on the league page now relies on. That pill
+            * is shown to everyone, so most people arriving here for the first
+            * time will land on exactly this. */}
           <Text style={[Typography.h2, { color: theme.text, textAlign: 'center' }]}>
-            You&rsquo;re not in a mini league yet
+            You aren&rsquo;t currently involved in any mini leagues
           </Text>
           <Text style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>
             Paid members can start one from their profile and invite anyone — paid or not.

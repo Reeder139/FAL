@@ -13,7 +13,6 @@ import {
 import { LeagueTable } from '@/components/league-table';
 import { TabScreen } from '@/components/tab-screen';
 import { MaxContentWidth, NavIconSize, Radii, Spacing, Typography } from '@/constants/theme';
-import { fetchMyMiniLeagues } from '@/lib/miniLeagues';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchNationalStandings, type NationalStandings } from '@/lib/divisions';
 
@@ -66,16 +65,9 @@ export default function NationalLeagueScreen() {
   const theme = useTheme();
   // Header stats only — the table itself, including the free-member ghost
   // row, comes from LeagueTable.
-  const [inAMiniLeague, setInAMiniLeague] = useState(false);
   const [standings, setStandings] = useState<NationalStandings | null>(null);
   const [loading, setLoading] = useState(true);
 
-
-  useEffect(() => {
-    fetchMyMiniLeagues()
-      .then((leagues) => setInAMiniLeague(leagues.length > 0))
-      .catch(() => setInAMiniLeague(false));
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,15 +104,16 @@ export default function NationalLeagueScreen() {
             icon={require('@/assets/images/nav/leaders.png')}
             label="Leaders"
           />
-          {/* Only once there is one to look at. A pill leading to an empty
-            * page is a worse answer than no pill. */}
-          {inAMiniLeague && (
-            <LeagueLink
-              href="/league/mini"
-              icon={require('@/assets/images/nav/national-league.png')}
-              label="Mini Leagues"
-            />
-          )}
+          {/* Always shown, whether or not they are in one. It used to appear
+            * only once there was a league to look at, on the grounds that a
+            * pill leading to an empty page is worse than no pill — but that
+            * hid the feature from exactly the people who had not found it
+            * yet. The page answers for itself when there is nothing there. */}
+          <LeagueLink
+            href="/league/mini"
+            icon={require('@/assets/images/nav/national-league.png')}
+            label="Mini Leagues"
+          />
         </View>
 
         <View style={styles.header}>
