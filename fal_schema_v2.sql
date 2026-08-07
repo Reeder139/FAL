@@ -4456,15 +4456,16 @@ language plpgsql security definer set search_path = public as $$
 declare
   v_season seasons%rowtype;
 begin
+  if coalesce(current_setting('app.defer_position_recording', true), 'off') = 'on' then
+    return;
+  end if;
+
   v_season := public.season_for_date(current_date);
   if v_season.id is null then
     return;
   end if;
 
   with
-  -- Where everyone stands right now, in both competitions. The national
-  -- table already ranks itself; the divisional one is ranked here, over paid
-  -- entries only, which is what league_table_with_ghost numbers on screen.
   current_positions as (
     select n.angler_id, 'national'::text as scope, null::uuid as division_id,
            n.position::integer as position, n.total_points
@@ -4477,8 +4478,6 @@ begin
     from division_league_table dl
     where dl.season_id = v_season.id
   ),
-  -- The last thing recorded for each angler and scope. distinct on is the
-  -- cheap "latest row per group" against the descending index.
   previous_positions as (
     select distinct on (h.angler_id, h.scope)
            h.angler_id, h.scope, h.position, h.division_id
@@ -4491,8 +4490,6 @@ begin
     from current_positions c
     left join previous_positions p
       on p.angler_id = c.angler_id and p.scope = c.scope
-    -- A first sighting counts as a change: it is how an angler gets their
-    -- opening row. It raises no notification, though — see below.
     where p.position is null or p.position <> c.position
   ),
   written as (
@@ -4502,9 +4499,6 @@ begin
     from changed ch
     returning angler_id, scope
   )
-  -- Notifications, from the same comparison. Nothing for a first sighting:
-  -- an angler entering the table has not moved, and telling them they were
-  -- overtaken on their first ever catch would be nonsense.
   insert into league_position_events
     (angler_id, season_id, scope, kind, from_position, to_position, other_angler_id)
   select
@@ -4517,10 +4511,6 @@ begin
     case
       when ch.position < ch.previous_position then null
       else (
-        -- Who passed them: an angler who was behind before and is ahead now.
-        -- The nearest such — the one now immediately in front — is the one
-        -- worth naming. Null when nobody passed them directly and they
-        -- slipped because the table rearranged around them.
         select other.angler_id
         from current_positions other
         join previous_positions prev_other
@@ -4540,6 +4530,54 @@ end; $$;
 
 revoke all on function public.record_league_positions() from public, anon;
 grant execute on function public.record_league_positions() to service_role;
+
+-- ---------------------------------------------------------------------------
+-- The batch itself.
+--
+-- Returns how many were actually verified. Catches already at `verified` are
+-- skipped rather than re-reviewed: a second review row saying "verified" adds
+-- no evidence, and the count coming back lower than the number ticked is how
+-- the console reports that.
+-- ---------------------------------------------------------------------------
+create or replace function public.verify_catches(
+  p_catch_ids uuid[],
+  p_reason    text
+)
+returns integer
+language plpgsql security definer set search_path = public as $$
+declare
+  v_id      uuid;
+  v_count   integer := 0;
+begin
+  if coalesce(btrim(p_reason), '') = '' then
+    raise exception 'a reason is required' using errcode = '22023';
+  end if;
+  if p_catch_ids is null or array_length(p_catch_ids, 1) is null then
+    raise exception 'no catches selected' using errcode = '22023';
+  end if;
+
+  perform set_config('app.defer_position_recording', 'on', true);
+
+  for v_id in
+    select c.id from catches c
+    where c.id = any(p_catch_ids)
+      and c.status is distinct from 'verified'
+  loop
+    perform public.verify_catch(v_id, p_reason);
+    v_count := v_count + 1;
+  end loop;
+
+  -- One recompute for the whole batch, and with it one notification per
+  -- angler describing where they actually ended up.
+  perform set_config('app.defer_position_recording', 'off', true);
+  perform public.record_league_positions();
+
+  return v_count;
+end; $$;
+
+revoke all on function public.verify_catches(uuid[], text) from public, anon;
+grant execute on function public.verify_catches(uuid[], text) to service_role, authenticated;
+
 
 -- ---------------------------------------------------------------------------
 -- Fired by the thing that moves the standings: a catch appearing, or its

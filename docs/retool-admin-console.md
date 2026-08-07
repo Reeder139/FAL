@@ -646,6 +646,60 @@ There is deliberately no path back to `pending`. It is the submit-time state,
 and a catch sitting in it with a review history saying otherwise is a
 contradiction rather than a state anyone needs.
 
+### Bulk verify
+
+For a queue full of fish from comped staff accounts, where clearing them one
+at a time is the bottleneck. One reason covers the batch.
+
+```ts
+// verify_catches — returns how many were actually verified. Ids already at
+// `verified` are skipped rather than re-reviewed, so a count lower than the
+// number ticked is not an error; report it.
+export default async function ({ params, user }) {
+  const { catchIds, reason } = params
+  if (!reason?.trim()) throw new Error('A reason is required.')
+  if (!catchIds?.length) throw new Error('Select at least one catch.')
+
+  const result = await carpLeaguesAdmin.query(
+    `with actor as (select set_config('app.admin_actor', $1, true))
+     select public.verify_catches($2::uuid[], $3::text) as verified from actor`,
+    [user.email, catchIds, reason.trim()]
+  )
+  return { success: true, verified: result.data[0]?.verified }
+}
+```
+
+Build the table for it like this:
+
+- **A checkbox column** on the review table, and **a select-all checkbox in
+  its header**. Retool's Table has this built in — set *Row selection* to
+  `Multiple` and enable *Select all*. `{{ reviewTable.selectedDataPoints }}`
+  is then the array to map to ids.
+- **One reason field** above the button, shared by the batch, plus a count so
+  the operator can see what they are about to do: *"Verify 14 catches"*.
+- **A confirmation step** on the button. Verifying is not destructive — a
+  catch can still be rejected afterwards — but it makes fish count towards
+  standings and prizes, and a mis-click with select-all ticked is the whole
+  queue.
+- **Report the returned count**, not the number selected. "Verified 12 of 14
+  — 2 were already verified" is the honest message.
+
+Three things this does that a loop of `verify_catch` from Retool would not:
+
+- **It is one transaction.** The batch lands whole or not at all. A bad id
+  fails the lot rather than leaving half the queue done and no record of where
+  it stopped.
+- **It still writes one review row and one audit row per catch.** The batch is
+  a convenience for the operator, not a shortcut in the evidence trail — each
+  catch keeps its own reviewer, timestamp and reason.
+- **It raises one round of standings notifications, not one per catch.** The
+  positions trigger is statement-level on `catches`, so verifying twenty fish
+  one at a time would recompute the league twenty times and tell everyone they
+  had been overtaken at each intermediate step — movements that never happened,
+  being artefacts of the order the batch was applied in. `verify_catches`
+  defers recording until the batch is done and then records once, so each
+  angler gets a single notification describing where they actually ended up.
+
 ---
 
 ## Members
