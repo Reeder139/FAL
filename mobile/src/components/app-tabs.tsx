@@ -2,6 +2,7 @@ import { NativeTabs } from 'expo-router/unstable-native-tabs';
 
 import { Colors } from '@/constants/theme';
 import { useUnreadActivityCount } from '@/lib/activity';
+import { emitTabReselect } from '@/lib/tabReselect';
 
 /**
  * Native (iOS/Android) bottom tab bar. The web build uses app-tabs.web.tsx
@@ -26,7 +27,17 @@ export default function AppTabs() {
       backgroundColor={colors.background}
       indicatorColor={colors.backgroundElement}
       labelStyle={{ selected: { color: colors.text } }}>
-      <NativeTabs.Trigger name="index">
+      {/* tabPress fires for any press on this tab, including one arriving
+        * from another tab, so the focus check is what makes it mean "pressed
+        * the tab you are already on". Without it, coming back to the Feed
+        * from League would throw away your place in the list. */}
+      <NativeTabs.Trigger
+        name="index"
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            if (navigation.isFocused()) emitTabReselect('home');
+          },
+        })}>
         <NativeTabs.Trigger.Label hidden>Feed</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/nav/feed.png')}

@@ -16,6 +16,7 @@ import {
 } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useUnreadActivityCount } from '@/lib/activity';
+import { emitTabReselect } from '@/lib/tabReselect';
 
 // The raised Catch button floats centered over this bar (see catch-fab.tsx)
 // — it isn't one of the TabTriggers below. Reserve a gap the same width as
@@ -41,7 +42,7 @@ export default function AppTabs() {
       <TabList asChild>
         <CustomTabList>
           <TabTrigger name="home" href="/" asChild>
-            <TabButton icon={require('@/assets/images/nav/feed.png')} label="Feed" />
+            <TabButton icon={require('@/assets/images/nav/feed.png')} label="Feed" tab="home" />
           </TabTrigger>
           {/* Lands on the National League table — every angler in the season,
             * paid or free, in one standing. Divisions and the leaders board
@@ -74,9 +75,12 @@ type TabButtonProps = TabTriggerSlotProps & {
    * badge is worse than no badge, because a permanent red dot stops meaning
    * anything. */
   badgeCount?: number;
+  /** The tab's route name. Given only by tabs whose screen does something
+   * when it is pressed a second time — see useTabReselect. */
+  tab?: string;
 };
 
-export function TabButton({ icon, label, badgeCount = 0, isFocused, ...props }: TabButtonProps) {
+export function TabButton({ icon, label, badgeCount = 0, tab, isFocused, onPress, ...props }: TabButtonProps) {
   const theme = useTheme();
   // Past 99 the exact number stops being information and starts being a
   // layout problem — the badge would be wider than the icon it sits on.
@@ -85,6 +89,14 @@ export function TabButton({ icon, label, badgeCount = 0, isFocused, ...props }: 
   return (
     <Pressable
       {...props}
+      // Pressing the tab you are already on navigates to the route it is
+      // already showing, so routing alone cannot express "back to the top".
+      // The trigger's own handler still runs — it is a no-op here, and
+      // swallowing it would break the press for every other case.
+      onPress={(e) => {
+        if (tab && isFocused) emitTabReselect(tab);
+        onPress?.(e);
+      }}
       accessibilityRole="tab"
       // The count belongs in the accessible name, not just the pixels: a
       // screen reader user gets "Activity, 3 unread" rather than "Activity"

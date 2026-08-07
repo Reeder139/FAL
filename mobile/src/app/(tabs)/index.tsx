@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FeedTabs } from '@/components/feed-tabs';
@@ -18,6 +18,7 @@ import {
 } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchFeedPage, type FeedItemWithPhoto, type FeedTab } from '@/lib/feed';
+import { useTabReselect } from '@/lib/tabReselect';
 import { getLastFeedTab, setLastFeedTab } from '@/lib/feedTabPreference';
 import { fetchPaidMemberIds } from '@/lib/paidMembers';
 import { fetchFollowingIds, hasAnySeasonEntry } from '@/lib/follows';
@@ -38,6 +39,14 @@ export default function HomeScreen() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [paidIds, setPaidIds] = useState<Set<string>>(new Set());
+  const listRef = useRef<FlatList<FeedItemWithPhoto>>(null);
+
+  // Pressing Feed while already on Feed takes you back to the top, the way
+  // every other tab bar behaves. Animated, so it reads as the list travelling
+  // rather than the content being swapped underneath you.
+  useTabReselect('home', () => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  });
 
   useEffect(() => {
     fetchFollowingIds().then(setFollowingIds);
@@ -175,6 +184,7 @@ export default function HomeScreen() {
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           data={items}
           keyExtractor={(item) => item.post_id}
           renderItem={({ item }) => (
