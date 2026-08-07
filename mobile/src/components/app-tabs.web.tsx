@@ -1,12 +1,21 @@
 import { Tabs, TabList, TabTrigger, TabSlot, TabTriggerSlotProps, TabListProps } from 'expo-router/ui';
 import { Children, type ReactNode } from 'react';
-import { Image, Pressable, View, StyleSheet, type ImageSourcePropType } from 'react-native';
+import { Image, Pressable, Text, View, StyleSheet, type ImageSourcePropType } from 'react-native';
 
 import { FAB_SIZE } from './catch-fab';
 import { ThemedView } from './themed-view';
 
-import { MaxContentWidth, NavDividerSize, NavIconSize, NavIconWide, Spacing } from '@/constants/theme';
+import {
+  MaxContentWidth,
+  NavBadge,
+  NavDividerSize,
+  NavIconSize,
+  Radii,
+  Spacing,
+  Typography,
+} from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useUnreadActivityCount } from '@/lib/activity';
 
 // The raised Catch button floats centered over this bar (see catch-fab.tsx)
 // — it isn't one of the TabTriggers below. Reserve a gap the same width as
@@ -24,6 +33,8 @@ const FAB_CLEARANCE = FAB_SIZE + Spacing.five;
 const LEFT_TAB_COUNT = 2;
 
 export default function AppTabs() {
+  const unread = useUnreadActivityCount();
+
   return (
     <Tabs>
       <TabSlot style={{ height: '100%' }} />
@@ -41,8 +52,8 @@ export default function AppTabs() {
           <TabTrigger name="activity" href="/activity" asChild>
             <TabButton
               icon={require('@/assets/images/nav/activity.png')}
-              iconBox={NavIconWide}
               label="Activity"
+              badgeCount={unread}
             />
           </TabTrigger>
           <TabTrigger name="profile" href="/profile" asChild>
@@ -59,26 +70,26 @@ type TabButtonProps = TabTriggerSlotProps & {
   /** The tab's name. Not drawn — the artwork is the label now — but carried
    * as the accessible name, since a screen reader can't read a picture. */
   label: string;
-  /** Override for artwork whose aspect is far from square, so it can be given
-   * a box matching the others by area. Must be the artwork's true dimensions,
-   * not a square containing it — the bar's row height comes from the tallest
-   * icon box, so slack here deepens the whole bar. Defaults to a NavIconSize
-   * square. */
-  iconBox?: { width: number; height: number };
+  /** Unread items behind this tab. 0 or undefined draws nothing — an empty
+   * badge is worse than no badge, because a permanent red dot stops meaning
+   * anything. */
+  badgeCount?: number;
 };
 
-export function TabButton({
-  icon,
-  label,
-  iconBox = { width: NavIconSize, height: NavIconSize },
-  isFocused,
-  ...props
-}: TabButtonProps) {
+export function TabButton({ icon, label, badgeCount = 0, isFocused, ...props }: TabButtonProps) {
+  const theme = useTheme();
+  // Past 99 the exact number stops being information and starts being a
+  // layout problem — the badge would be wider than the icon it sits on.
+  const badge = badgeCount > 99 ? '99+' : String(badgeCount);
+
   return (
     <Pressable
       {...props}
       accessibilityRole="tab"
-      accessibilityLabel={label}
+      // The count belongs in the accessible name, not just the pixels: a
+      // screen reader user gets "Activity, 3 unread" rather than "Activity"
+      // and no idea there is anything waiting.
+      accessibilityLabel={badgeCount > 0 ? `${label}, ${badgeCount} unread` : label}
       // aria-selected set directly rather than via accessibilityState:
       // react-native-web renders this trigger as an <a>, and the state prop
       // doesn't reach the DOM there — leaving a role="tab" with no selected
@@ -88,15 +99,32 @@ export function TabButton({
       <ThemedView
         type={isFocused ? 'backgroundSelected' : 'backgroundElement'}
         style={styles.tabButtonView}>
-        {/* Unfocused icons are dimmed rather than recoloured: the artwork is
-         * full-colour gold, so tinting it to a "muted" token would fight the
-         * asset. Opacity keeps the selected tab obvious while leaving every
-         * icon recognisable. */}
-        <Image
-          source={icon}
-          style={[iconBox, !isFocused && styles.iconUnfocused]}
-          resizeMode="contain"
-        />
+        <View style={styles.iconBox}>
+          {/* Unfocused icons are dimmed rather than recoloured: the artwork is
+           * full-colour gold, so tinting it to a "muted" token would fight the
+           * asset. Opacity keeps the selected tab obvious while leaving every
+           * icon recognisable. */}
+          <Image
+            source={icon}
+            style={[styles.icon, !isFocused && styles.iconUnfocused]}
+            resizeMode="contain"
+          />
+          {/* Outside the dimming, deliberately: an unread count is the one
+            * thing on this bar that has to be as loud on the tab you are not
+            * looking at as on the one you are. */}
+          {badgeCount > 0 && (
+            <View
+              aria-hidden
+              style={[
+                styles.badge,
+                { backgroundColor: theme.notification, borderColor: theme.backgroundElement },
+              ]}>
+              <Text style={[Typography.navLabel, styles.badgeText, { color: theme.onNotification }]}>
+                {badge}
+              </Text>
+            </View>
+          )}
+        </View>
       </ThemedView>
     </Pressable>
   );
@@ -206,7 +234,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.half,
     borderRadius: Spacing.three,
   },
+  // The badge anchors to this rather than to the tab button, so it tracks the
+  // artwork's corner and not the padded box around it. RN Views are already
+  // `position: relative`, which is what bounds the absolute child below.
+  iconBox: {
+    width: NavIconSize,
+    height: NavIconSize,
+  },
+  icon: {
+    width: '100%',
+    height: '100%',
+  },
   iconUnfocused: {
     opacity: 0.65,
+  },
+  badge: {
+    position: 'absolute',
+    top: NavBadge.offsetTop,
+    right: NavBadge.offsetRight,
+    height: NavBadge.size,
+    minWidth: NavBadge.minWidth,
+    paddingHorizontal: NavBadge.paddingHorizontal,
+    borderRadius: Radii.circle,
+    borderWidth: NavBadge.borderWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    textAlign: 'center',
   },
 });

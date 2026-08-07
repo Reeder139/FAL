@@ -1,3 +1,5 @@
+import { useCallback, useSyncExternalStore } from 'react';
+
 import { getPublicStorageUrl } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 
@@ -78,6 +80,74 @@ export async function fetchUnreadActivityCount(): Promise<number> {
   return (data as number | null) ?? 0;
 }
 
+// ---------------------------------------------------------------------------
+// The unread count, shared by the tab bar and refreshed on a timer.
+//
+// A module-level store rather than a context, for the same reason
+// leagueSummary.ts is one: the reader is the tab bar, which is mounted once,
+// and threading a provider down to it gains nothing.
+//
+// It polls because there is no realtime subscription anywhere in this app yet.
+// A badge that only updates on a full page load is barely a badge — the whole
+// point is to tell an angler something happened while they were on another
+// tab. One cheap RPC a minute, only while something is actually subscribed, is
+// the smallest thing that makes it true. If realtime arrives later this is the
+// piece to replace.
+// ---------------------------------------------------------------------------
+
+const UNREAD_POLL_MS = 60_000;
+
+let unreadCount = 0;
+let unreadInflight: Promise<void> | null = null;
+let unreadTimer: ReturnType<typeof setInterval> | null = null;
+const unreadListeners = new Set<() => void>();
+
+function emitUnread() {
+  for (const l of unreadListeners) l();
+}
+
+/** Refetch the badge count. Shares an in-flight request rather than stacking
+ * them, since the poll and a manual refresh can land together. */
+export function refreshUnreadActivity(): Promise<void> {
+  if (unreadInflight) return unreadInflight;
+  unreadInflight = fetchUnreadActivityCount()
+    .then((next) => {
+      if (next !== unreadCount) {
+        unreadCount = next;
+        emitUnread();
+      }
+    })
+    .finally(() => {
+      unreadInflight = null;
+    });
+  return unreadInflight;
+}
+
+export function useUnreadActivityCount(): number {
+  const subscribe = useCallback((onChange: () => void) => {
+    unreadListeners.add(onChange);
+    if (unreadTimer === null) {
+      void refreshUnreadActivity();
+      unreadTimer = setInterval(() => void refreshUnreadActivity(), UNREAD_POLL_MS);
+    }
+    return () => {
+      unreadListeners.delete(onChange);
+      // Last one out stops the timer, so nothing keeps polling in the
+      // background once the bar is gone (signing out, for one).
+      if (unreadListeners.size === 0 && unreadTimer !== null) {
+        clearInterval(unreadTimer);
+        unreadTimer = null;
+      }
+    };
+  }, []);
+
+  return useSyncExternalStore(
+    subscribe,
+    () => unreadCount,
+    () => unreadCount
+  );
+}
+
 /**
  * Marks everything up to now as seen, and returns the watermark it replaced.
  *
@@ -90,10 +160,20 @@ export async function fetchUnreadActivityCount(): Promise<number> {
  *
  * Failing is not worth telling the angler about — the worst case is that a
  * few rows show as unread once more.
+ *
+ * Zeroing the tab badge is done here rather than by the screen, because the
+ * watermark and the badge are two views of one fact: the moment this succeeds
+ * there is nothing unread, and a caller that moved the watermark without
+ * clearing the badge would leave a count sitting over an already-read list
+ * until the next poll.
  */
 export async function markActivityRead(): Promise<string | null> {
   const { data, error } = await supabase.rpc('mark_activity_read');
   if (error) return null;
+  if (unreadCount !== 0) {
+    unreadCount = 0;
+    emitUnread();
+  }
   return (data as string | null) ?? null;
 }
 

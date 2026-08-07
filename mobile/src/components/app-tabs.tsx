@@ -1,6 +1,7 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 
 import { Colors } from '@/constants/theme';
+import { useUnreadActivityCount } from '@/lib/activity';
 
 /**
  * Native (iOS/Android) bottom tab bar. The web build uses app-tabs.web.tsx
@@ -18,6 +19,7 @@ import { Colors } from '@/constants/theme';
 export default function AppTabs() {
   // Always dark, matching useTheme() — see the note there.
   const colors = Colors.dark;
+  const unread = useUnreadActivityCount();
 
   return (
     <NativeTabs
@@ -49,6 +51,12 @@ export default function AppTabs() {
           src={require('@/assets/images/nav/activity.png')}
           renderingMode="original"
         />
+        {/* The OS draws and places this one; the web bar draws its own. Hidden
+          * rather than omitted at zero — an empty badge is a permanent red dot
+          * that stops meaning anything. */}
+        <NativeTabs.Trigger.Badge hidden={unread === 0}>
+          {unread > 99 ? '99+' : String(unread)}
+        </NativeTabs.Trigger.Badge>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="profile">

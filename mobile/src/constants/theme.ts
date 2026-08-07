@@ -106,6 +106,12 @@ export const Colors = {
 
     success: Palette.successGreen,
     danger: Palette.alertRed,
+    /** Fill for the unread-count badge on the Activity tab. Deliberately the
+     * deeper red rather than `danger`: this one is a solid swatch carrying
+     * white text, and alertRed leaves that at about 2.6:1. `danger` stays what
+     * it is — a text and border colour on dark surfaces, where it belongs. */
+    notification: Palette.alertRedLight,
+    onNotification: Palette.pureWhite,
 
     divisionOne: Palette.divisionBlue,
     divisionTwo: Palette.royalPurple,
@@ -141,6 +147,8 @@ export const Colors = {
 
     success: Palette.deepGreen,
     danger: Palette.alertRedLight,
+    notification: Palette.alertRedLight,
+    onNotification: Palette.pureWhite,
 
     divisionOne: Palette.oceanBlue,
     divisionTwo: Palette.royalPurple,
@@ -464,20 +472,32 @@ export const CatchPlus = { length: 26, thickness: 4 } as const;
  * even split has since bought back ~20px per tab. The bar's depth follows
  * from this value, so raising it deepens the bar by the same amount. */
 export const NavIconSize = 42;
-/** Box for the activity icon specifically. Its artwork is 1.63:1 where every
- * other nav symbol is near-square, so it gets its own size rather than being
- * squared off — squared, the art fills only ~61% of the box and reads as the
- * small icon in the row.
+/** The unread-count badge riding the Activity tab's bell.
  *
- * Width matches the others by area (`NavIconSize * sqrt(1.63)`), putting
- * ~54x33 of artwork on screen against their 42x42. Matching by height
- * instead would need a 68px box, wider than a whole tab on a 360px phone.
+ * `size` is the diameter at a single digit; two or more digits stretch it
+ * horizontally into a pill via `minWidth` and the padding, rather than
+ * growing the circle, so the badge stays the same height whatever it reads.
  *
- * Height is given explicitly, and must stay the artwork's true height at
- * this width. A square box here would be transparent above and below the
- * art — but the bar sizes its row from the tallest icon box, so that
- * invisible padding would deepen the whole bar by 12px. */
-export const NavIconWide = { width: 54, height: 33 } as const;
+ * The offsets are negative so the badge overhangs the icon box's corner
+ * rather than sitting inside it, which keeps it clear of the bell itself.
+ * They are small, and must stay small: the badge grows leftwards from a
+ * fixed right edge, so its overhang is what decides whether the widest form
+ * ("99+", 30px) clears the next tab along. At -7 it overlapped the profile
+ * icon by 3px on a 320px screen. Nothing clips it — no ancestor sets
+ * `overflow: hidden` — so an overhang that is too big collides rather than
+ * being cut off, which is worse.
+ *
+ * `borderWidth` separates the red from the gold underneath it. Without a
+ * ring the two warm colours sit straight against each other and the badge
+ * reads as part of the bell rather than as something on top of it. */
+export const NavBadge = {
+  size: 18,
+  minWidth: 18,
+  paddingHorizontal: 4,
+  borderWidth: 2,
+  offsetTop: -2,
+  offsetRight: -2,
+} as const;
 /** The hairlines that separate the bottom nav bar's icons from each other and
  * from the raised Catch button.
  *

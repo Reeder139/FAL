@@ -179,7 +179,7 @@ Don't invent new division colors per screen — always pull `divisionOne` /
 | `LeagueStripTextMinWidth` | 208 | Width the strip reserves for its text column before sizing the banner |
 | `SearchIconSize` | 28 | Member-search icon on the feed, right-aligned on the tab pills' row |
 | `NavIconSize` | 42 | Bottom nav bar icons — bounded by tab width (~62px at 360), not height |
-| `NavIconWide` | 54×33 | Box for the activity icon, whose art is 1.63:1 — area-matched to the rest |
+| `NavBadge` | 18 tall, 2px ring, −2/−2 offset | Unread-count badge on the Activity tab's bell |
 | `NavDividerSize` | 1×30 | Hairlines between nav icons and either side of the Catch button |
 
 ### Bottom nav bar
@@ -248,18 +248,35 @@ is headroom above 36. It was tighter at five: a 2/3 split left right-hand tabs a
 ~41px, giving 5.3px between icons at 36 and 1.3px at 40 — which is why 40 was
 backed out then. Adding a fifth tab back brings that constraint with it.
 
-**Mismatched aspects.** The activity artwork is 1.63:1 where the others are
-0.98–1.26, so squaring it leaves the art filling ~61% of the box height and
-reading as the small icon in the row. It gets `NavIconWide` instead, whose width
-is `NavIconSize * sqrt(1.63)` — matching the others by *area* (54×33 against
-42×42). Matching by height would need a 68px box, wider than a whole tab at 360.
+**Mismatched aspects.** Every symbol is squared to `NavIconSize` by the prep
+script, which only works because they all sit within 0.83–1.26. The activity tab
+used to be the exception: its art was a composite of a heart, a bell and a
+notification bubble at 1.63:1, and squaring that left it filling ~61% of the box
+height and reading as the small icon in the row, so it carried a wider box of
+its own. Both are gone — the tab is a plain bell at 0.83 and squares like the
+rest. If artwork this far from square ever returns it needs both halves back: an
+unsquared asset *and* a true-aspect box, because the bar takes its row height
+from the tallest icon box and a square box padded with transparency nobody can
+see made the whole bar 12px deeper.
 
-Its asset is also left at its true aspect by the prep script rather than padded
-to a square, and `NavIconWide` carries an explicit height to suit. That isn't
-cosmetic: the bar's row height comes from the tallest icon box, so a square
-activity box padded the row with transparency nobody could see and made the
-whole bar 12px deeper. Any future icon this far from square needs both halves —
-an unsquared asset and a true-aspect box.
+**The unread badge.** The Activity tab draws a count over its bell, from
+`activity_unread_count()` via the store in `lib/activity.ts`. It is a circle at
+one digit and stretches into a pill at two or more, so its height never changes,
+and it caps at "99+" — past that the number stops being information and starts
+being a layout problem.
+
+It grows leftwards from a fixed right edge, which is why `NavBadge`'s offsets
+are small. The overhang is the whole margin: at −7 the widest form ("99+", 30px)
+overlapped the neighbouring profile icon by 3px on a 320px screen. Nothing
+clips it — no ancestor sets `overflow: hidden` — so too much overhang collides
+rather than being cut off. At −2 the same case clears by 2px.
+
+The 2px ring around it is `backgroundElement`, the bar's own colour, separating
+red from gold. Without it the two warm colours sit straight against each other
+and the badge reads as part of the bell rather than as something on top of it.
+
+Native doesn't use any of this: `NativeTabs.Trigger.Badge` hands the count to
+the OS, which draws and places it to platform convention.
 
 ### The League Position strip's join banner
 

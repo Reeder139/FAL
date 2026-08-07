@@ -1,21 +1,15 @@
-// Prepares the bottom nav bar's icons from the source art in
-// <repo>/Images/nav icons new/.
+// Prepares the bottom nav bar's icons from the source art under <repo>/Images.
 //
-// Each source is a 768x768 canvas with the symbol floating small in the
-// middle of it — between 198 and 274px of actual ink, so roughly a third of
-// the frame. Shipping the canvas whole would mean the bar renders mostly
-// empty space and the symbol comes out about a third of its intended size.
+// Each source is a canvas with the symbol floating small in the middle of it —
+// between 198 and 274px of actual ink, so roughly a third of the frame.
+// Shipping the canvas whole would mean the bar renders mostly empty space and
+// the symbol comes out about a third of its intended size.
 //
 // So each is cropped to its own ink and padded back to a common square. The
-// padding matters as much as the crop: the symbols range from 0.98 to 1.26
+// padding matters as much as the crop: the symbols range from 0.83 to 1.26
 // in aspect, and squaring them at a shared size is what stops the podium
-// (widest) out-weighing the profile ring (tallest) once they sit side by
-// side at identical box sizes.
-//
-// The activity icon is the exception and is handled in the bar, not here:
-// at 1.63:1 it's far wider than the rest, so squaring it leaves the artwork
-// filling only ~61% of the box height and reading as a smaller icon. The bar
-// renders it in a wider box to compensate — see NavIconSizeWide.
+// (widest) out-weighing the bell (tallest) once they sit side by side at
+// identical box sizes.
 //
 // An earlier set of this artwork had each tab's name baked in underneath the
 // symbol, which this script cropped off. These replacements are symbol-only,
@@ -33,41 +27,80 @@ import path from 'node:path';
 
 import sharp from 'sharp';
 
-const SRC_DIR = path.resolve('..', 'Images', 'nav icons new');
+const SRC_DIR = path.resolve('..', 'Images');
 const OUT_DIR = path.resolve('assets', 'images', 'nav');
 
-/** Source file -> bundled name. The numeric prefixes are the order the art
- * was delivered in, not the nav order — see app-tabs.web.tsx for that.
+/** Source file (relative to Images/) -> bundled name. The numeric prefixes are
+ * the order the art was delivered in, not the nav order — see app-tabs.web.tsx
+ * for that.
  *
  * divisions and leaders are still built even though the bar no longer shows
  * them: they moved to options on the league page, and the art is 3-7KB each.
  */
 const ICONS = [
-  ['01_feed_symbol.png', 'feed.png', { square: true }],
-  ['02_national_league_symbol.png', 'national-league.png', { square: true }],
-  ['03_divisions_symbol.png', 'divisions.png', { square: true }],
-  ['04_leaders_symbol.png', 'leaders.png', { square: true }],
-  ['05_profile_symbol.png', 'profile.png', { square: true }],
-  // Kept at its own 1.63:1 rather than squared. Padding it to a square puts
-  // transparent bands above and below the art, and the bar sizes its row
-  // from the tallest icon box — so a square activity icon made the whole bar
-  // 12px deeper to hold padding nobody can see.
-  ['activity.png', 'activity.png', { square: false }],
+  ['nav icons new/01_feed_symbol.png', 'feed.png', { square: true }],
+  ['nav icons new/02_national_league_symbol.png', 'national-league.png', { square: true }],
+  ['nav icons new/03_divisions_symbol.png', 'divisions.png', { square: true }],
+  ['nav icons new/04_leaders_symbol.png', 'leaders.png', { square: true }],
+  ['nav icons new/05_profile_symbol.png', 'profile.png', { square: true }],
+  // The bell replaces an earlier composite of a heart, a bell and a "1"
+  // notification bubble. The composite was 1.63:1 and needed its own wider box
+  // in the bar to stay legible, and its baked-in "1" claimed an unread count
+  // whether or not there was one — the bar now draws a real badge from
+  // activity_unread_count() instead. This one is a plain JPEG on black, hence
+  // keyBlack.
+  ['Nav Icons/bell.jpeg', 'activity.png', { square: true, keyBlack: true }],
 ];
 
 /** Alpha at or below this counts as empty canvas. Low, so the crop keeps
  * each symbol's antialiased edge, glow and drop shadow. */
 const ALPHA_FLOOR = 16;
+/** Brightness either side of which a keyBlack source is fully transparent or
+ * fully opaque, with a ramp between. The floor sits above JPEG noise in the
+ * black surround; the ceiling is low enough that the bell's own shaded flank
+ * stays solid rather than being mistaken for background. */
+const KEY_FLOOR = 6;
+const KEY_CEIL = 45;
 /** Bundled size. The bar renders these at NavIconSize (32), so this is 4x
  * for the densest screens. */
 const TARGET_SIZE = 128;
 
 const kb = (bytes) => `${(bytes / 1024).toFixed(0)}KB`;
 
-async function prepare(srcName, outName, { square }) {
+/**
+ * Turns a black surround into transparency, in place.
+ *
+ * The art is lit gold on black with no alpha channel, which is the same thing
+ * as gold already composited over black. So the recovery is the inverse of
+ * that composite: take alpha from brightness, then divide the colour back out
+ * by it. Without that division every glow pixel stays a muddy dark gold that
+ * only looks right on a black background — un-premultiplying gives back the
+ * bright gold at low opacity, which looks right on any of them.
+ *
+ * Brightness here is the max channel, not luminance. Luminance weights green
+ * heavily and gold is mostly red, so the bell's shaded flank scored low enough
+ * to be read as background: it came out semi-transparent, and the division
+ * above then blew it out to near-white on a light surface.
+ */
+function keyOutBlack(data, pixels, channels) {
+  for (let p = 0; p < pixels; p++) {
+    const i = p * channels;
+    const v = Math.max(data[i], data[i + 1], data[i + 2]);
+    const a = Math.min(1, Math.max(0, (v - KEY_FLOOR) / (KEY_CEIL - KEY_FLOOR)));
+    data[i + 3] = Math.round(a * 255);
+    if (a > 0) {
+      data[i] = Math.min(255, Math.round(data[i] / a));
+      data[i + 1] = Math.min(255, Math.round(data[i + 1] / a));
+      data[i + 2] = Math.min(255, Math.round(data[i + 2] / a));
+    }
+  }
+}
+
+async function prepare(srcName, outName, { square, keyBlack = false }) {
   const src = path.join(SRC_DIR, srcName);
   const { data, info } = await sharp(src).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width: w, height: h, channels } = info;
+  if (keyBlack) keyOutBlack(data, w * h, channels);
 
   let minX = w;
   let minY = h;
@@ -102,7 +135,7 @@ async function prepare(srcName, outName, { square }) {
   const after = (await stat(out)).size;
   const outMeta = await sharp(out).metadata();
   console.log(
-    `  ${srcName.padEnd(31)} ink ${String(cropW).padStart(3)}x${String(cropH).padStart(3)}` +
+    `  ${srcName.padEnd(42)} ink ${String(cropW).padStart(3)}x${String(cropH).padStart(3)}` +
       ` (ratio ${(cropW / cropH).toFixed(2)})  ->  ${outName.padEnd(20)}` +
       ` ${outMeta.width}x${outMeta.height}  ${kb(before)} -> ${kb(after)}`
   );
