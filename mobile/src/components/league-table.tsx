@@ -159,8 +159,21 @@ function TableRow({ row, showDivisionBadge, onJoin, isPaidMember }: RowProps) {
               <Text style={[Typography.caption, { color: divisionColor }]}>Div {row.divisionRank}</Text>
             </View>
           )}
+          {/* Two different empty states, because they are two different
+            * situations. A member on zero is *in* this division and simply
+            * has not scored in it yet — including someone who paid today,
+            * whose earlier fish count nationally but not here. A ghost is
+            * outside the competition looking in, so theirs stays conditional.
+            *
+            * Paid is the right test rather than isGhost's inverse in name
+            * only: isGhost means "unpaid" in a divisional table, and this is
+            * the one line where the distinction carries the meaning. */}
           <Text style={[Typography.caption, { color: theme.textMuted }]} numberOfLines={1}>
-            {hasScored ? scoringSummary(row) : 'Log a catch to see where you’d stand'}
+            {hasScored
+              ? scoringSummary(row)
+              : row.isGhost
+                ? 'Log a catch to see where you’d stand'
+                : 'Log your first catch to score'}
           </Text>
         </View>
       </View>

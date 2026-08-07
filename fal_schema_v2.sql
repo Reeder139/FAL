@@ -1606,24 +1606,29 @@ begin
   -- out. Ties share a number, which is what rank() did before.
   if p_division_id is not null then
     return query
+    -- Driven by season_entries, not league_table: being in the division is a
+    -- fact about membership, not about having caught something yet. Built the
+    -- other way round, a member only appeared once they had a qualifying fish
+    -- inside their paid stint — so anyone who paid today was missing from
+    -- their own division. left_at is null keeps it to the stint they are
+    -- currently in, which is also what makes this one row per angler: the
+    -- exclusion constraint allows only one open stint at a time.
     with base as (
       select
-        l.angler_id,
-        l.division_id,
-        l.total_points  as national_points,
-        l.counting_fish as national_fish,
-        l.best_fish_oz  as national_best,
-        exists (
-          select 1
-          from season_entries se
-          where se.angler_id = l.angler_id
-            and se.season_id = l.season_id
-            and se.tier = 'competitor'
-            and se.left_at is null
-        ) as is_paid
-      from league_table l
-      where l.season_id = v_season.id
-        and l.division_id = p_division_id
+        se.angler_id,
+        se.division_id,
+        (se.tier = 'competitor')     as is_paid,
+        coalesce(l.total_points, 0)  as national_points,
+        coalesce(l.counting_fish, 0) as national_fish,
+        l.best_fish_oz               as national_best
+      from season_entries se
+      left join league_table l
+        on l.angler_id = se.angler_id
+       and l.season_id = se.season_id
+       and l.division_id = se.division_id
+      where se.season_id = v_season.id
+        and se.division_id = p_division_id
+        and se.left_at is null
     ),
     -- A paid angler is scored on their paid fish only; an unpaid one is
     -- still shown at their national standing, because that is a real thing
