@@ -9,7 +9,7 @@ import { AppButton } from '@/components/app-button';
 import { DivisionWash, MaxContentWidth, Radii, Spacing, Typography, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { refreshLeagueSummary } from '@/lib/leagueSummary';
-import { AlreadyMemberError, hasActiveMembership, startMembershipCheckout } from '@/lib/membership';
+import { AlreadyMemberError, isLeagueMember, startMembershipCheckout } from '@/lib/membership';
 import { useAuth } from '@/providers/auth-provider';
 
 /**
@@ -72,8 +72,8 @@ export default function JoinScreen() {
   }, []);
 
   // Coming back from Stripe. Success is a redirect, not proof — the webhook
-  // is what grants membership, so this waits for the subscription to appear
-  // rather than taking the URL's word for it.
+  // is what grants membership, so this waits for the season_entries stint
+  // apply_membership opens rather than taking the URL's word for it.
   useEffect(() => {
     if (checkout === 'cancelled') {
       setStatus({ kind: 'cancelled' });
@@ -83,7 +83,7 @@ export default function JoinScreen() {
 
     setStatus({ kind: 'confirming' });
     const check = async () => {
-      if (await hasActiveMembership()) {
+      if (await isLeagueMember()) {
         stopPolling();
         setStatus({ kind: 'member' });
         // The tab layout and the League strip both read a cached summary
@@ -103,10 +103,11 @@ export default function JoinScreen() {
     return stopPolling;
   }, [checkout, stopPolling]);
 
-  // Someone who is already paying should not be sold to.
+  // Someone who is already a member should not be sold to — including a
+  // comped member, who has no subscription behind their membership.
   useEffect(() => {
     if (checkout || !session) return;
-    void hasActiveMembership().then((paid) => {
+    void isLeagueMember().then((paid) => {
       if (paid) setStatus({ kind: 'member' });
     });
   }, [checkout, session]);

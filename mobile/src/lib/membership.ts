@@ -59,10 +59,41 @@ async function readFunctionError(error: unknown): Promise<{ error?: string; alre
 /** True when this angler's subscription is one Stripe considers paying.
  *
  * Mirrors is_paying_status() in the database — past_due counts, because that
- * is Stripe retrying a card rather than a membership that has ended. */
+ * is Stripe retrying a card rather than a membership that has ended.
+ *
+ * Answers "is Stripe taking their money", which is not the same question as
+ * "are they a member" — see isLeagueMember. Only the billing surfaces should
+ * care about this one.
+ */
 export async function hasActiveMembership(): Promise<boolean> {
   const { data } = await supabase.from('subscriptions').select('status').maybeSingle();
   return ['active', 'trialing', 'past_due'].includes(data?.status ?? '');
+}
+
+/**
+ * True when this angler is a competitor in the running season.
+ *
+ * This — not a Stripe subscription — is what membership means everywhere else
+ * in the app: the gold ring, mini-league creation, the divisional tables and
+ * is_paid_member() all read a `competitor` stint in season_entries. Paying is
+ * merely the usual way to get one.
+ *
+ * The join page used to ask hasActiveMembership() instead, which meant a
+ * comped member — given a stint directly, with no Stripe subscription behind
+ * it — was still shown the £8/month offer for something they already had.
+ *
+ * It is also the better question after checkout: the redirect back from Stripe
+ * is not proof of anything, and the row this waits for is precisely the one
+ * apply_membership writes when the webhook lands.
+ */
+export async function isLeagueMember(): Promise<boolean> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+  const { data, error } = await supabase.rpc('is_paid_member', { p_angler_id: user.id });
+  if (error) return false;
+  return data === true;
 }
 
 export interface MembershipState {
