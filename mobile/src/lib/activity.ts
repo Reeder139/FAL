@@ -14,7 +14,34 @@ export type ActivityKind =
   | 'catch_verified'
   | 'catch_rejected'
   | 'catch_under_review'
-  | 'catch_pending';
+  | 'catch_pending'
+  | 'position_moved_up'
+  | 'position_overtaken';
+
+/**
+ * A league move, unpacked from the `body` of a `position_*` event.
+ *
+ * The feed's row shape has one free-text field and no numbers, so the scope
+ * and both positions travel through it as "national:3:5". Parsed here rather
+ * than in the screen so the format is described in one place — and returns
+ * null rather than throwing if it is ever anything else, since a malformed
+ * row should cost one line of detail, not the whole Activity tab.
+ */
+export interface PositionMove {
+  scope: 'national' | 'division';
+  from: number;
+  to: number;
+}
+
+export function parsePositionMove(body: string | null): PositionMove | null {
+  if (!body) return null;
+  const [scope, from, to] = body.split(':');
+  if (scope !== 'national' && scope !== 'division') return null;
+  const fromN = Number(from);
+  const toN = Number(to);
+  if (!Number.isInteger(fromN) || !Number.isInteger(toN)) return null;
+  return { scope, from: fromN, to: toN };
+}
 
 export interface ActivityEvent {
   kind: ActivityKind | string;

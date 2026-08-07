@@ -3999,6 +3999,22 @@ language sql stable as $$
     join catches c on c.id = cr.catch_id
     cross join me
     where c.angler_id = me.id
+
+    union all
+
+    -- You moved in a league. The actor is whoever passed you, where one
+    -- angler is nameable; otherwise there is none and the row reads as
+    -- movement rather than as something a person did to you.
+    --
+    -- The body carries the scope and both positions, because the row has
+    -- nowhere else to put them and the screen should not have to re-query the
+    -- league to say "3rd to 5th".
+    select
+      ('position_' || e.kind)::text, e.occurred_at, e.other_angler_id, null::uuid,
+      null::uuid, e.scope || ':' || e.from_position || ':' || e.to_position
+    from league_position_events e
+    cross join me
+    where e.angler_id = me.id
   )
   select
     e.kind,
@@ -4366,3 +4382,305 @@ end; $$;
 
 revoke all on function public.join_mini_league(text) from public, anon;
 grant execute on function public.join_mini_league(text) to authenticated, service_role;
+
+-- ============================================================================
+-- 14. LEAGUE POSITION HISTORY
+--
+-- Scoring is computed and never stored, so there is nothing to hang a trend
+-- arrow off. Positions are recorded explicitly instead, whenever a catch
+-- changes what they are, and read at two different baselines: a day ago for
+-- the arrow, and the moment before for the "you were overtaken" notification.
+-- ============================================================================
+create table if not exists league_position_history (
+  id           bigint generated always as identity primary key,
+  season_id    uuid not null references seasons(id) on delete cascade,
+  angler_id    uuid not null references profiles(id) on delete cascade,
+  -- 'national' is every angler with a qualifying fish; 'division' is the
+  -- paid competition, where only competitor stints are numbered.
+  scope        text not null check (scope in ('national', 'division')),
+  division_id  uuid references divisions(id) on delete cascade,
+  position     integer not null,
+  total_points numeric not null,
+  recorded_at  timestamptz not null default now()
+);
+
+-- The arrow's query: newest row for one angler and scope at or before a
+-- cutoff. Descending, because every read of this table wants the latest.
+create index if not exists league_position_history_angler_idx
+  on league_position_history (angler_id, scope, recorded_at desc);
+create index if not exists league_position_history_season_idx
+  on league_position_history (season_id, scope, recorded_at desc);
+
+alter table league_position_history enable row level security;
+
+-- Readable by all, like every other standings surface — a position is public
+-- the moment it appears in a league table. Written only by the recorder
+-- below, which is security definer; there is deliberately no insert policy.
+create policy "position history readable by all"
+  on league_position_history for select using (true);
+
+-- ---------------------------------------------------------------------------
+-- The notifications. Their own table rather than derived on read: "X overtook
+-- you" is true at a moment and stops being true the moment it changes again,
+-- so it has to be captured when it happens.
+-- ---------------------------------------------------------------------------
+create table if not exists league_position_events (
+  id              bigint generated always as identity primary key,
+  -- Who is being told. Not who did it.
+  angler_id       uuid not null references profiles(id) on delete cascade,
+  season_id       uuid not null references seasons(id) on delete cascade,
+  scope           text not null check (scope in ('national', 'division')),
+  kind            text not null check (kind in ('moved_up', 'overtaken')),
+  from_position   integer not null,
+  to_position     integer not null,
+  -- The angler who passed them, on an 'overtaken' row. Null when nobody in
+  -- particular is responsible — a position can worsen because someone
+  -- further down scored, without anyone passing this angler directly.
+  other_angler_id uuid references profiles(id) on delete set null,
+  occurred_at     timestamptz not null default now()
+);
+
+create index if not exists league_position_events_angler_idx
+  on league_position_events (angler_id, occurred_at desc);
+
+alter table league_position_events enable row level security;
+
+-- Only yours. Unlike the history, this is a notification: it is addressed to
+-- one angler and nobody else needs to read that they slipped a place.
+create policy "own position events"
+  on league_position_events for select using (auth.uid() = angler_id);
+
+create or replace function public.record_league_positions()
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_season seasons%rowtype;
+begin
+  v_season := public.season_for_date(current_date);
+  if v_season.id is null then
+    return;
+  end if;
+
+  with
+  -- Where everyone stands right now, in both competitions. The national
+  -- table already ranks itself; the divisional one is ranked here, over paid
+  -- entries only, which is what league_table_with_ghost numbers on screen.
+  current_positions as (
+    select n.angler_id, 'national'::text as scope, null::uuid as division_id,
+           n.position::integer as position, n.total_points
+    from national_league_table n
+    where n.season_id = v_season.id
+    union all
+    select dl.angler_id, 'division', dl.division_id,
+           rank() over (partition by dl.division_id order by dl.total_points desc)::integer,
+           dl.total_points
+    from division_league_table dl
+    where dl.season_id = v_season.id
+  ),
+  -- The last thing recorded for each angler and scope. distinct on is the
+  -- cheap "latest row per group" against the descending index.
+  previous_positions as (
+    select distinct on (h.angler_id, h.scope)
+           h.angler_id, h.scope, h.position, h.division_id
+    from league_position_history h
+    where h.season_id = v_season.id
+    order by h.angler_id, h.scope, h.recorded_at desc
+  ),
+  changed as (
+    select c.*, p.position as previous_position
+    from current_positions c
+    left join previous_positions p
+      on p.angler_id = c.angler_id and p.scope = c.scope
+    -- A first sighting counts as a change: it is how an angler gets their
+    -- opening row. It raises no notification, though — see below.
+    where p.position is null or p.position <> c.position
+  ),
+  written as (
+    insert into league_position_history
+      (season_id, angler_id, scope, division_id, position, total_points)
+    select v_season.id, ch.angler_id, ch.scope, ch.division_id, ch.position, ch.total_points
+    from changed ch
+    returning angler_id, scope
+  )
+  -- Notifications, from the same comparison. Nothing for a first sighting:
+  -- an angler entering the table has not moved, and telling them they were
+  -- overtaken on their first ever catch would be nonsense.
+  insert into league_position_events
+    (angler_id, season_id, scope, kind, from_position, to_position, other_angler_id)
+  select
+    ch.angler_id,
+    v_season.id,
+    ch.scope,
+    case when ch.position < ch.previous_position then 'moved_up' else 'overtaken' end,
+    ch.previous_position,
+    ch.position,
+    case
+      when ch.position < ch.previous_position then null
+      else (
+        -- Who passed them: an angler who was behind before and is ahead now.
+        -- The nearest such — the one now immediately in front — is the one
+        -- worth naming. Null when nobody passed them directly and they
+        -- slipped because the table rearranged around them.
+        select other.angler_id
+        from current_positions other
+        join previous_positions prev_other
+          on prev_other.angler_id = other.angler_id and prev_other.scope = other.scope
+        where other.scope = ch.scope
+          and other.angler_id <> ch.angler_id
+          and prev_other.position > ch.previous_position
+          and other.position < ch.position
+          and (ch.scope = 'national' or other.division_id = ch.division_id)
+        order by other.position desc
+        limit 1
+      )
+    end
+  from changed ch
+  where ch.previous_position is not null;
+end; $$;
+
+revoke all on function public.record_league_positions() from public, anon;
+grant execute on function public.record_league_positions() to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Fired by the thing that moves the standings: a catch appearing, or its
+-- status changing. Scoring counts `verified` catches only, so a rejection is
+-- as much a change as a verification.
+--
+-- Statement-level and unconditional. A row-level `when` clause would have to
+-- be evaluated per row and would still call this once per row.
+-- ---------------------------------------------------------------------------
+create or replace function public.catches_changed_standings()
+returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  perform public.record_league_positions();
+  return null;
+end; $$;
+
+drop trigger if exists catches_record_positions on catches;
+create trigger catches_record_positions
+  after insert or update or delete on catches
+  for each statement
+  execute function public.catches_changed_standings();
+
+create or replace function public.league_position_delta(
+  p_angler_id uuid,
+  p_scope     text,
+  p_since     interval default interval '24 hours'
+)
+returns integer
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_season   seasons%rowtype;
+  v_current  integer;
+  v_previous integer;
+begin
+  v_season := public.season_for_date(current_date);
+  if v_season.id is null then
+    return null;
+  end if;
+
+  if p_scope = 'national' then
+    select n.position::integer into v_current
+    from national_league_table n
+    where n.season_id = v_season.id and n.angler_id = p_angler_id;
+  else
+    select r.position into v_current
+    from (
+      select dl.angler_id,
+             rank() over (partition by dl.division_id order by dl.total_points desc)::integer as position
+      from division_league_table dl
+      where dl.season_id = v_season.id
+    ) r
+    where r.angler_id = p_angler_id;
+  end if;
+
+  if v_current is null then
+    return null;
+  end if;
+
+  -- The last position recorded at or before the cutoff. Not "the row from
+  -- yesterday" — there may not be one, because rows are written only when a
+  -- position changes. The most recent one before the cutoff is where they
+  -- stood at the cutoff.
+  select h.position into v_previous
+  from league_position_history h
+  where h.angler_id = p_angler_id
+    and h.scope = p_scope
+    and h.season_id = v_season.id
+    and h.recorded_at <= now() - p_since
+  order by h.recorded_at desc
+  limit 1;
+
+  if v_previous is null then
+    return null;
+  end if;
+
+  return v_previous - v_current;
+end; $$;
+
+revoke all on function public.league_position_delta(uuid, text, interval) from public, anon;
+grant execute on function public.league_position_delta(uuid, text, interval)
+  to authenticated, service_role;
+
+create or replace function public.my_league_standing()
+returns table (
+  scope         text,
+  -- `position` is reserved in a RETURNS TABLE clause — POSITION(x IN y) is a
+  -- SQL function. league_table_with_ghost hit the same wall and settled on
+  -- this name, so it is the one the client already knows.
+  position_in_table integer,
+  total_points  numeric,
+  member_count  integer,
+  division_name text,
+  delta         integer
+)
+language plpgsql stable security definer set search_path = public as $$
+declare
+  v_caller uuid := auth.uid();
+  v_season seasons%rowtype;
+begin
+  if v_caller is null then
+    return;
+  end if;
+  v_season := public.season_for_date(current_date);
+  if v_season.id is null then
+    return;
+  end if;
+
+  return query
+  select
+    'national'::text,
+    n.position::integer,
+    n.total_points,
+    (select count(*)::integer from national_league_table x where x.season_id = v_season.id),
+    null::text,
+    public.league_position_delta(v_caller, 'national')
+  from national_league_table n
+  where n.season_id = v_season.id and n.angler_id = v_caller;
+
+  return query
+  with ranked as (
+    select
+      dl.angler_id,
+      dl.division_id,
+      dl.total_points,
+      rank() over (partition by dl.division_id order by dl.total_points desc)::integer as position,
+      count(*) over (partition by dl.division_id)::integer as member_count
+    from division_league_table dl
+    where dl.season_id = v_season.id
+  )
+  select
+    'division'::text,
+    r.position,
+    r.total_points,
+    r.member_count,
+    d.name,
+    public.league_position_delta(v_caller, 'division')
+  from ranked r
+  join divisions d on d.id = r.division_id
+  where r.angler_id = v_caller;
+end; $$;
+
+revoke all on function public.my_league_standing() from public, anon;
+grant execute on function public.my_league_standing() to authenticated, service_role;

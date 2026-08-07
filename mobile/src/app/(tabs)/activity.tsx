@@ -11,11 +11,12 @@ import {
   ACTIVITY_PAGE_SIZE,
   fetchActivity,
   markActivityRead,
+  parsePositionMove,
   timeAgo,
   type ActivityEvent,
 } from '@/lib/activity';
 import { fetchPaidMemberIds } from '@/lib/paidMembers';
-import { formatWeightOz } from '@/lib/units';
+import { formatWeightOz, ordinal } from '@/lib/units';
 
 const AVATAR_SIZE = 40;
 const THUMB_SIZE = 40;
@@ -39,6 +40,12 @@ function presentation(kind: string, theme: ReturnType<typeof useTheme>) {
       return { icon: 'close-circle' as const, colour: theme.danger };
     case 'catch_under_review':
       return { icon: 'alert-circle' as const, colour: theme.gold };
+    // Same green-up / red-down as the strip's arrow, so a move means the
+    // same thing wherever it is shown.
+    case 'position_moved_up':
+      return { icon: 'trending-up' as const, colour: theme.success };
+    case 'position_overtaken':
+      return { icon: 'trending-down' as const, colour: theme.danger };
     default:
       return { icon: 'notifications' as const, colour: theme.textMuted };
   }
@@ -66,6 +73,21 @@ function describe(event: ActivityEvent): string {
       return `Your catch${weight} was rejected`;
     case 'catch_under_review':
       return `Your catch${weight} is under review`;
+    case 'position_moved_up':
+    case 'position_overtaken': {
+      const move = parsePositionMove(event.body);
+      const where = move?.scope === 'division' ? 'your division' : 'the National League';
+      if (!move) return 'Your league position changed';
+      if (event.kind === 'position_moved_up') {
+        return `You moved up to ${ordinal(move.to)} in ${where}`;
+      }
+      // Named when one angler is identifiable, which is not always: a
+      // position can worsen because someone further down scored, with nobody
+      // passing this angler directly.
+      return event.actorUsername
+        ? `${event.actorUsername} overtook you in ${where} — now ${ordinal(move.to)}`
+        : `You slipped to ${ordinal(move.to)} in ${where}`;
+    }
     default:
       return 'Something happened on your account';
   }
@@ -137,9 +159,15 @@ export default function ActivityScreen() {
   }, [events, hasMore, loadingMore]);
 
   const openTarget = (event: ActivityEvent) => {
-    // A follow is about a person; everything else is about a post.
+    // A follow is about a person; a league move is about a table; everything
+    // else is about a post.
     if (event.kind === 'follow' && event.actorId) {
       openAngler(event.actorId);
+      return;
+    }
+    if (event.kind.startsWith('position_')) {
+      const move = parsePositionMove(event.body);
+      router.push(move?.scope === 'division' ? '/league/divisions' : '/league');
       return;
     }
     if (event.postId) router.push({ pathname: '/post/[id]', params: { id: event.postId } });

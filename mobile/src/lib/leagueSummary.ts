@@ -2,38 +2,62 @@ import { useCallback, useSyncExternalStore } from 'react';
 
 import { supabase } from '@/lib/supabase';
 
-/** True only for a `competitor`-tier entry in the running season. Everyone
- * else — `open` tier, or no season_entries row at all — is a non-paid
- * member and gets the "Join the League" prompt on the summary strip. */
-type PaidFlag = { isPaidMember: boolean };
+/** One side of the strip: where the angler stands in a competition. */
+export interface LeagueStanding {
+  /** Null when they have a score but no numbered place — a paid member who
+   * has not caught anything inside their paid stint yet. */
+  position: number | null;
+  points: number;
+  memberCount: number;
+  /** Places gained since this time yesterday; positive is up the table.
+   *
+   * Null means "no comparison available", not "no movement": nothing was
+   * recorded from before the cutoff, which is the case for anyone whose first
+   * qualifying fish was today. The strip draws no arrow at all for null, and
+   * none for zero either — an arrow that never moves stops being read. */
+  delta: number | null;
+  /** Set on the divisional side only. */
+  divisionName: string | null;
+}
 
-export type LeagueSummary = PaidFlag &
-  (
-    | { kind: 'no_catches' }
-    | { kind: 'no_active_season' }
-    | { kind: 'member'; divisionName: string; position: number | null; divisionMemberCount: number; points: number }
-    | { kind: 'free'; points: number; position: number | null; divisionMemberCount: number; divisionName: string | null }
-  );
+export interface LeagueSummary {
+  /** A `competitor` stint in the running season. Everyone else — `open` tier,
+   * or no season_entries row at all — is a free member. */
+  isPaidMember: boolean;
+  /** False when no season is running, which is its own message rather than an
+   * empty standing. */
+  hasSeason: boolean;
+  /** Their national placing. Null until they have a qualifying fish — every
+   * angler is in that table, paid or free, so null here means no score yet
+   * rather than not being a member. */
+  national: LeagueStanding | null;
+  /** Their divisional placing. Null for a free member, which is what turns
+   * the right-hand side of the strip into the invitation to join. */
+  division: LeagueStanding | null;
+}
+
+interface StandingRow {
+  scope: string;
+  position_in_table: number | null;
+  total_points: number;
+  member_count: number;
+  division_name: string | null;
+  delta: number | null;
+}
 
 /**
- * Drives the league summary strip. Checked in this order:
- * 1. No catches at all yet (regardless of membership) -> neutral prompt.
- * 2. Has catches, but no season is currently open/running -> its own
- *    message. This must NOT fall back to "no_catches" — that's actively
- *    wrong when the angler has genuinely logged something; it just isn't
- *    scoreable against anything right now.
- * 3. Is a paid member of the current season -> read straight from
- *    division_league_table. The strip states a *divisional* standing, so it
- *    has to be scored the way the division is: fish caught before they paid
- *    do not count towards it, even though they still count nationally.
- * 4. No paid entry -> hypothetical_league_position, the same
- *    "mirror the real scoring without requiring a row" approach the catch
- *    result card uses for hypothetical_catch_preview.
+ * Both of the angler's standings, for the League Position strip.
  *
- * The season and entry lookups now happen before the no_catches check
- * rather than after, because paid status has to be known for every branch
- * — a paid member with no catches yet shouldn't be told to go and join.
- * The ordering of the branches themselves is unchanged.
+ * The positions, the member counts and the day-on-day deltas all come from
+ * my_league_standing() in one call. Ranking a division is a rule, not an
+ * arithmetic detail — paid entries only, by points — and it has to agree with
+ * what league_table_with_ghost draws on the league page, so it stays in SQL
+ * where that rule already lives.
+ *
+ * The old version of this asked hypothetical_league_position for a free
+ * member's score, because free members were absent from the national table
+ * entirely. They are in it now, so their standing is simply read like anyone
+ * else's and the hypothetical path is gone.
  */
 export async function fetchLeagueSummary(): Promise<LeagueSummary | null> {
   const {
@@ -42,82 +66,61 @@ export async function fetchLeagueSummary(): Promise<LeagueSummary | null> {
   if (!user) return null;
 
   const today = new Date().toISOString().slice(0, 10);
-  const [{ count: catchCount }, { data: season }] = await Promise.all([
-    supabase.from('catches').select('id', { count: 'exact', head: true }).eq('angler_id', user.id),
-    supabase
-      .from('seasons')
-      .select('id')
-      .in('status', ['open', 'running'])
-      .lte('starts_on', today)
-      .gte('ends_on', today)
-      .order('starts_on', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
+  const { data: season } = await supabase
+    .from('seasons')
+    .select('id')
+    .in('status', ['open', 'running'])
+    .lte('starts_on', today)
+    .gte('ends_on', today)
+    .order('starts_on', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  const { data: entry } = season
-    ? await supabase
-        .from('season_entries')
-        .select('division_id, tier')
-        .eq('season_id', season.id)
-        .eq('angler_id', user.id)
-        .is('left_at', null)
-        .maybeSingle()
-    : { data: null };
-
-  const isPaidMember = entry?.tier === 'competitor';
-
-  if (!catchCount) return { kind: 'no_catches', isPaidMember };
-  if (!season) return { kind: 'no_active_season', isPaidMember };
-
-  // Paid members only. division_league_table contains `competitor` stints and
-  // nothing else, so a free member holding an open-tier entry has no row in
-  // it and would read as zero points — they belong on the hypothetical path
-  // below, which is what it exists for.
-  if (entry && isPaidMember) {
-    const [{ data: table }, { data: division }, { count: memberCount }] = await Promise.all([
-      supabase
-        .from('division_league_table')
-        .select('total_points, position')
-        .eq('season_id', season.id)
-        .eq('division_id', entry.division_id)
-        .eq('angler_id', user.id)
-        .maybeSingle(),
-      supabase.from('divisions').select('name').eq('id', entry.division_id).maybeSingle(),
-      supabase
-        .from('season_entries')
-        .select('id', { count: 'exact', head: true })
-        .eq('season_id', season.id)
-        .eq('division_id', entry.division_id),
-    ]);
-
-    return {
-      kind: 'member',
-      isPaidMember,
-      divisionName: division?.name ?? '—',
-      // No league_table row means nothing verified in-period yet — points-
-      // only, same "don't show a fabricated rank" principle as the <20
-      // members case below.
-      position: table?.position ?? null,
-      divisionMemberCount: memberCount ?? 0,
-      points: table?.total_points ?? 0,
-    };
+  if (!season) {
+    return { isPaidMember: false, hasSeason: false, national: null, division: null };
   }
 
-  const { data: hypRows } = await supabase.rpc('hypothetical_league_position', { p_angler_id: user.id });
-  const hyp = hypRows?.[0];
-  // A season exists, but no division matches this angler's declared PB —
-  // a data-configuration gap (divisions should cover the full range), not
-  // "no catches". Closest existing state: nothing seasonal to show.
-  if (!hyp) return { kind: 'no_active_season', isPaidMember };
+  const [{ data: entry }, { data: rows }] = await Promise.all([
+    supabase
+      .from('season_entries')
+      .select('tier, divisions(name)')
+      .eq('season_id', season.id)
+      .eq('angler_id', user.id)
+      .is('left_at', null)
+      .maybeSingle(),
+    supabase.rpc('my_league_standing'),
+  ]);
+
+  const isPaidMember = entry?.tier === 'competitor';
+  const standings = (rows ?? []) as StandingRow[];
+  const toStanding = (row: StandingRow): LeagueStanding => ({
+    position: row.position_in_table,
+    points: row.total_points,
+    memberCount: row.member_count,
+    delta: row.delta,
+    divisionName: row.division_name,
+  });
+
+  const nationalRow = standings.find((r) => r.scope === 'national');
+  const divisionRow = standings.find((r) => r.scope === 'division');
+
+  // A paid member with no qualifying fish inside their paid stint has no row
+  // in division_league_table at all. They are still in that division, and
+  // showing them the join prompt because they have not scored yet would be
+  // selling them what they have already bought — so the side is built from
+  // their entry instead, at zero.
+  const entryDivision = (entry as { divisions?: { name: string } | null } | null)?.divisions?.name ?? null;
+  const division: LeagueStanding | null = divisionRow
+    ? toStanding(divisionRow)
+    : isPaidMember
+      ? { position: null, points: 0, memberCount: 0, delta: null, divisionName: entryDivision }
+      : null;
 
   return {
-    kind: 'free',
     isPaidMember,
-    points: hyp.hypothetical_season_total,
-    position: hyp.division_member_count >= 20 ? hyp.hypothetical_position : null,
-    divisionMemberCount: hyp.division_member_count,
-    divisionName: hyp.division_name,
+    hasSeason: true,
+    national: nationalRow ? toStanding(nationalRow) : null,
+    division,
   };
 }
 
